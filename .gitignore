@@ -1,0 +1,25 @@
+query_results/
+join_result.parquet
+test_redash.py
+backups/
+.vscode/
+.DS_Store
+
+# Python compiled files
+*.pyc
+*.pyo
+__pycache__/
+
+# Virtual environments
+venv/
+.env/
+
+# Environment variables
+*.env
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Cache and logs
+*.log
+*.cache/

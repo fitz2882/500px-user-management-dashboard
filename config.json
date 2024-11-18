@@ -1,0 +1,17 @@
+{
+    "redash_base_url": "https://redash.j79-prod.500px.net",
+    "api_key": "",
+    "query_ids": {
+        "query_1": 6520,
+        "query_2": 6521,
+        "query_3": 6522
+    },
+    "output_folder": "./query_results",
+    "fixed_output_parquet": "./join_result.parquet",
+    "data_path": "./data/join_result.parquet",
+    "country_mappings_path": "./mappings/country_mappings.json",
+    "region_mappings_path": "./mappings/region_mappings.json",
+    "debug": true,
+    "host": "localhost",
+    "port": 8050
+}
