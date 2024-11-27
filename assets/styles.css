@@ -512,3 +512,40 @@ table {
     border-color: #d6ae2b;
     box-shadow: 0 0 0 5px #d6ae2b;
 }
+
+.table-hover>tbody>tr:hover>* {
+    --bs-table-color-state: var(--bs-table-hover-color);
+    --bs-table-bg-state: #ffe48a6d;
+}
+
+/* Remove default loading spinner */
+#loading-1.loading-wrapper > div:first-child {
+    display: none;
+}
+
+/* Add blur effect to content while loading */
+#loading-1.loading-wrapper._dash-loading {
+    filter: blur(2px);
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+/* Position the loading spinner */
+._dash-loading {
+    position: fixed !important;
+    top: 50vh !important;
+    left: 37.5vw !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 1000;
+}
+
+/* Loading overlay */
+._dash-loading-callback {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 75vw;
+    height: 100vh;
+    background-color: rgba(255, 255, 255, 0.5);
+    cursor: progress;
+}

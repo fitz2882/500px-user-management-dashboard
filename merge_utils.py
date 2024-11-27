@@ -55,6 +55,10 @@ def join_csv_files(csv_file_1, csv_file_2, csv_file_3, output_file):
     # Fill NaN values with zeros or appropriate defaults
     df_merged.fillna(0, inplace=True)
 
+    # Filter out rows with blank activity_week
+    df_merged = df_merged[df_merged['activity_week'].notna() & (df_merged['activity_week'] != '')]
+    print("Removed rows with blank activity_week values")
+
     # Save the joined DataFrame to CSV
     df_merged.to_csv(output_file, index=False)
     print(f"Join results saved to {output_file}")

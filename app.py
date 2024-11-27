@@ -579,49 +579,56 @@ app.layout = dbc.Container([
         dbc.Col([
             html.Div([
                 html.Div([
-                    dbc.Table(
-                        id='table',
-                        children=[
-                            html.Thead(
-                                html.Tr([
-                                    html.Th('Row'),
-                                    html.Th(select_all_checkbox),
-                                    html.Th('User ID'),
-                                    html.Th('Username'),
-                                    html.Th('Name'),
-                                    html.Th('User Type'),
-                                    html.Th('Registration Date'),
-                                    html.Th('Membership'),
-                                    html.Th('Country'),
-                                    html.Th('Region'),
-                                    html.Th('Profile URL'),
-                                    html.Th('Social Links'),
-                                    html.Th('Uploads *'),
-                                    html.Th('Licensing Submissions *'),
-                                    html.Th('Avg Aesthetic Score'),
-                                    html.Th('Avg LAI Score'),
-                                    html.Th('Exclusivity Rate'),
-                                    html.Th('Acceptance Rate'),
-                                    html.Th('Sales *'),
-                                    html.Th('Revenue *'),
-                                    html.Th('Likes *'),
-                                    html.Th('Comments *'),
-                                    html.Th('AVG Visit Days (per Month)'),
-                                    html.Th('Photos Featured *'),
-                                    html.Th('Galleries Featured *'),
-                                    html.Th('Stories Featured *')
-                                ], className='table-header')
-                            ),
-                            html.Tbody(id='table-body')
-                        ],
-                        bordered=True,
-                        hover=True,
-                        responsive=False,
-                        striped=True,
-                        className='table-sm',
-                        style={'tableLayout': 'auto', 'width': '100%'}
+                    dcc.Loading(
+                        id="loading-1",
+                        overlay_style={"visibility":"visible", "filter": "blur(2px)"},
+                        type="default",  # or "default", "cube", "dot", "graph"
+                        children=[  
+                            dbc.Table(
+                                id='table',
+                                children=[
+                                    html.Thead(
+                                        html.Tr([
+                                            html.Th('Row'),
+                                            html.Th(select_all_checkbox),
+                                            html.Th('User ID'),
+                                            html.Th('Username'),
+                                            html.Th('Name'),
+                                            html.Th('User Type'),
+                                            html.Th('Registration Date'),
+                                            html.Th('Membership'),
+                                            html.Th('Country'),
+                                            html.Th('Region'),
+                                            html.Th('Profile URL'),
+                                            html.Th('Social Links'),
+                                            html.Th('Uploads *'),
+                                            html.Th('Licensing Submissions *'),
+                                            html.Th('Avg Aesthetic Score'),
+                                            html.Th('Avg LAI Score'),
+                                            html.Th('Exclusivity Rate'),
+                                            html.Th('Acceptance Rate'),
+                                            html.Th('Sales *'),
+                                            html.Th('Revenue *'),
+                                            html.Th('Likes *'),
+                                            html.Th('Comments *'),
+                                            html.Th('AVG Visit Days (per Month)'),
+                                            html.Th('Photos Featured *'),
+                                            html.Th('Galleries Featured *'),
+                                            html.Th('Stories Featured *')
+                                        ], className='table-header')
+                                    ),
+                                    html.Tbody(id='table-body')
+                                ],
+                                bordered=True,
+                                hover=True,
+                                responsive=False,
+                                striped=True,
+                                className='table-sm',
+                                style={'tableLayout': 'auto', 'width': '100%'}
+                            )
+                        ]
                     ),
-                ], style={'overflowX': 'auto', 'overflowY': 'auto', 'height': 'calc(100vh - 89px)'}),
+                    ], style={'overflowX': 'auto', 'overflowY': 'auto', 'height': 'calc(100vh - 89px)'}),
                 html.Div([
                     dbc.Row([
                         dbc.Col([
