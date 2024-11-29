@@ -1,6 +1,7 @@
 import requests
 import time
 import os
+from dotenv import load_dotenv
 import json
 from datetime import datetime
 from merge_utils import join_csv_files 
@@ -39,47 +40,47 @@ def download_query_result(base_url, query_result_id, api_key, output_csv_file):
         f.write(response.content)
 
 def main():
+    load_dotenv()
+
     # Load configurations from config.json
-    with open('config.json', 'r') as f:
-        config = json.load(f)
+    with open('config.json', 'r') as config_file:
+        config = json.load(config_file)
+
+    # Update config with API key from environment variable
+    config['api_key'] = os.getenv('REDASH_API_KEY')
 
     base_url = config['redash_base_url']
     api_key = config['api_key']
     query_ids = config['query_ids']
     output_folder = config['output_folder']
 
-    # Create a timestamped folder for today's date
-    timestamp = datetime.now().strftime("%Y%m%d")
-    folder_path = os.path.join(output_folder, timestamp)
-    os.makedirs(folder_path, exist_ok=True)
-
     csv_files = {}
     for key, query_id in query_ids.items():
         print(f"Executing {key} (Query ID: {query_id})")
         query_result_id = execute_query(base_url, query_id, api_key)
-        output_csv_file = os.path.join(folder_path, f"{key}.csv")
+        output_csv_file = os.path.join(output_folder, f"{key}.csv")
         print(f"Downloading result to {output_csv_file}")
         download_query_result(base_url, query_result_id, api_key, output_csv_file)
         csv_files[key] = output_csv_file
 
     # Merge the CSV files
-    timestamped_join_file = os.path.join(folder_path, 'join_result.csv')
-    print(f"Merging CSV files into {timestamped_join_file}")
+    join_file = os.path.join(output_folder, 'join_result.csv')
+    print(f"Merging CSV files into {join_file}")
     
     join_csv_files(
         csv_files['query_1'],
         csv_files['query_2'],
         csv_files['query_3'],
-        timestamped_join_file
+        join_file
     )
 
     # Convert the merged CSV to Parquet format
-    join_parquet_file = os.path.join(folder_path, 'join_result.parquet')
-    print(f"Converting {timestamped_join_file} to Parquet format at {join_parquet_file}")
+    join_parquet_file = os.path.join(output_folder, 'join_result.parquet')
+    print(f"Converting {join_file} to Parquet format at {join_parquet_file}")
     
     # Load the merged CSV into a DataFrame
     df = pd.read_csv(
-        timestamped_join_file,
+        join_file,
         dtype={
             'user_id': 'Int64',
             'activity_week': 'string',
@@ -116,7 +117,6 @@ def main():
     shutil.copyfile(join_parquet_file, fixed_output_parquet)
     
     print(f"Parquet file saved to {fixed_output_parquet}")
-
     print("Process completed successfully.")
 
 if __name__ == '__main__':

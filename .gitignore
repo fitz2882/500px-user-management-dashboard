@@ -4,6 +4,7 @@ test_redash.py
 backups/
 .vscode/
 .DS_Store
+data/
 
 # Python compiled files
 *.pyc
@@ -23,3 +24,5 @@ venv/
 # Cache and logs
 *.log
 *.cache/
+cache/
+logs/

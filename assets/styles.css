@@ -46,6 +46,24 @@ body {
     color: #222;
 }
 
+#reload-data-button {
+    background-color: tomato;
+    color: #222;
+    font-weight: 700;
+    border: 0px;
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+#reload-data-button:hover {
+    background-color: rgb(213, 82, 59);
+    color: #222;
+}
+
+#user-id-search {
+    margin-bottom: 30px;
+}
+
 .clear-filters {
     margin-bottom: 20px !important;
 }
@@ -137,6 +155,21 @@ body {
 
 .DayPickerKeyboardShortcuts_show__bottomRight:hover::before {
     border-right: 33px solid #d6ae2b;
+}
+
+.clear-date-button {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+}
+
+.clear-date-button:hover {
+    color: #495057;
 }
 
 .label {
@@ -548,4 +581,19 @@ table {
     height: 100vh;
     background-color: rgba(255, 255, 255, 0.5);
     cursor: progress;
+}
+
+.loading-wrapper._dash-loading {
+    filter: blur(2px);
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.no-results-row {
+    background-color: #ffa7a7 !important;
+    color: #000;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: left !important;
+    padding: 20px !important;
 }
