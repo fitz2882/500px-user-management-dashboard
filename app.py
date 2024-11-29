@@ -25,7 +25,6 @@ try:
         config = json.load(config_file)
     config['api_key'] = api_key
 except Exception as e:
-    print(f"Error loading config: {e}")
     config = {}
 
 app = Dash(
@@ -59,36 +58,32 @@ region_options = None
 membership_options = None
 data_lock = Lock()
 
-os.makedirs(os.path.dirname(config.get('data_path', './data/join_result.parquet')), exist_ok=True)
+os.makedirs(os.path.dirname(config.get('data_path', './data/join_result.csv')), exist_ok=True)
 
 # Helper functions
 @cache.memoize(timeout=300)
 def load_data(force_reload=False):
     """
-    Load data from the Parquet file if it has changed since the last read.
+    Load data from the CSV file if it has changed since the last read.
     Uses caching and thread-safe access.
     """
     global df, df_last_modified, user_type_options, region_options, membership_options, all_user_ids, start_date_reg, end_date_reg, start_date_act, end_date_act
-    print("\n=== Debug: load_data called ===")
     
     file_path = config.get('data_path')
     if not file_path:
-        print("Error: data_path not found in config")
         return create_empty_dataframe()
     
     try:
         # Force reload by clearing the cache if requested
         if force_reload:
             cache.delete_memoized(load_data)
-            print("Cache cleared for force reload")
         
         last_modified = os.path.getmtime(file_path)
         with data_lock:
             if df is None or df_last_modified != last_modified or force_reload:
-                print("Loading data from parquet file...")
-                df = pd.read_parquet(file_path)
+                df = pd.read_csv(file_path)
                 df_last_modified = last_modified
-                
+
                 # Process data 
                 df['activity_week'] = df['activity_week'].replace(['0', '', pd.NA, 'NaT'], pd.NaT)
                 df['registration_date'] = df['registration_date'].replace(['0', '', pd.NA, 'NaT'], pd.NaT)
@@ -151,7 +146,7 @@ def load_data(force_reload=False):
                     'Trial - Pro Monthly - 30 Days': 'Trial - Pro - M',
                     'Trial - Pro Yearly - 30 Days': 'Trial - Pro - Y'
                 })
-
+                
                 # Get unique user records by grouping by user_id
                 df = df.groupby('user_id').agg({
                     'activity_week': 'first',
@@ -180,6 +175,7 @@ def load_data(force_reload=False):
                     'df3_avg_visit_days_monthly': 'mean'
                 }).reset_index()
 
+    
                 # Convert 'membership' column to categorical after replacement
                 df['membership'] = df['membership'].astype('category')
 
@@ -209,10 +205,8 @@ def load_data(force_reload=False):
                     for membership in sorted(df['membership'].unique(), key=lambda x: custom_membership_order.index(x) if x in custom_membership_order else len(custom_membership_order))
                 ]
                 
-                print(f"Loaded and processed {len(df)} rows")
             return df
     except Exception as e:
-        print(f"Error loading data: {e}")
         return create_empty_dataframe()
     
     
@@ -265,7 +259,6 @@ def validate_and_format_url(link):
 def create_table_row(row, is_selected, row_number):
     """Create a table row with proper formatting and alignment."""
     user_id_str = str(row['user_id'])
-    print(f"Creating row for user {user_id_str}, selected: {is_selected}")
     
     # Format profile URLs - split by comma and create multiple links
     profile_links = []
@@ -1019,8 +1012,6 @@ def initialize_and_reset_data(pathname, reset_clicks, clear_reg_clicks, clear_ac
         ctx = dash.callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
         
-        print(f"\n=== Debug: initialize_and_reset_data called by {triggered_id} ===")
-        
         df = load_data()
         if df is None or df.empty:
             return [], [], [], [], [], None, None, None, None
@@ -1045,7 +1036,6 @@ def initialize_and_reset_data(pathname, reset_clicks, clear_reg_clicks, clear_ac
             
         elif triggered_id in ['url', 'reset-filters-button', None]:
             user_ids = df['user_id'].astype(str).tolist()
-            print(f"Resetting filters, returning all {len(user_ids)} user IDs")
             return user_ids, user_ids, user_type_options, region_options, membership_options, min_reg_date, max_reg_date, min_act_date, max_act_date
         
         # Apply filters
@@ -1120,12 +1110,10 @@ def initialize_and_reset_data(pathname, reset_clicks, clear_reg_clicks, clear_ac
                 pass
 
         filtered_user_ids = df[mask]['user_id'].astype(str).tolist()
-        print(f"Applied filters, returning {len(filtered_user_ids)} user IDs")
         
         return filtered_user_ids, filtered_user_ids, user_type_options, region_options, membership_options, reg_start or min_reg_date, reg_end or max_reg_date, act_start or min_act_date, act_end or max_act_date
         
     except Exception as e:
-        print(f"Error in initialize_and_reset_data: {str(e)}")
         raise
 
 
@@ -1158,11 +1146,8 @@ def manage_selections(select_all_checked, checkbox_values, filtered_user_ids, ch
     ctx = dash.callback_context
     trigger = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
     
-    print(f"\n=== Debug: manage_selections called by {trigger} ===")
-    
     # On initial load or when filtered_user_ids changes, select all users
     if not trigger or trigger == 'filtered_user_ids':
-        print("Initializing selections with all filtered IDs")
         return filtered_user_ids, ['all']
     
     # Handle select-all checkbox
@@ -1197,7 +1182,6 @@ def manage_selections(select_all_checked, checkbox_values, filtered_user_ids, ch
         
         # Update select-all checkbox based on whether all filtered users are selected
         all_selected = ['all'] if len(current_selected) == len(filtered_user_ids) else []
-        print(f"Individual selection changed. Selected count: {len(current_selected)}, All selected: {len(current_selected) == len(filtered_user_ids)}")
         
         return current_selected, all_selected
 
@@ -1309,12 +1293,6 @@ def update_table(filtered_user_ids, reg_start, reg_end, act_start, act_end,
             )
         ])
         return [no_results_row], "Showing 0 records", 0, 0
-
-    print("\n=== Debug: update_table called ===")
-    print(f"Trigger: {ctx.triggered[0]['prop_id']}")
-    print(f"Select all value: {select_all_value}")
-    print(f"Selected user IDs: {len(selected_user_ids) if selected_user_ids else 0}")
-    print(f"Filtered user IDs: {len(filtered_user_ids) if filtered_user_ids else 0}")
     
     # Convert rows_per_page to integer
     rows_per_page = int(rows_per_page) if rows_per_page else 20
@@ -1322,28 +1300,16 @@ def update_table(filtered_user_ids, reg_start, reg_end, act_start, act_end,
     # Load data only once
     df = load_data()
     
-    print("\n=== Debug: Initial Data Analysis ===")
-    print(f"Initial df shape: {df.shape}")
-    print(f"Initial unique user IDs: {len(df['user_id'].unique())}")
-    
     # Convert user_id to string for consistent comparison
     df['user_id'] = df['user_id'].astype(str)
     
     # Filter dataframe based on filtered_user_ids first
     if filtered_user_ids:
         mask = df['user_id'].astype(str).isin(filtered_user_ids)
-        print(f"\nFiltering Analysis:")
-        print(f"Number of user IDs to filter by: {len(filtered_user_ids)}")
-        print(f"Number of unique user IDs to filter by: {len(set(filtered_user_ids))}")
-        print(f"Sample of filtered_user_ids: {filtered_user_ids[:5]}")
-        print(f"Rows where mask is True: {mask.sum()}")
     else:
         mask = pd.Series(True, index=df.index)
     
     filtered_df = df[mask].copy()
-    print(f"\nAfter initial filtering:")
-    print(f"Filtered df shape: {filtered_df.shape}")
-    print(f"Filtered unique user IDs: {len(filtered_df['user_id'].unique())}")
     
     # Convert user_id to numeric for proper sorting
     df['user_id'] = pd.to_numeric(df['user_id'])
@@ -1432,8 +1398,7 @@ def update_table(filtered_user_ids, reg_start, reg_end, act_start, act_end,
     
     # Calculate pagination
     total_records = len(filtered_df)
-    print(f"Final length of filtered_df: {len(filtered_df)}")
-    print(f"Total records: {total_records}")
+
     if total_records == 0:
         return [], "No records to display", 1, 0
         
@@ -1454,7 +1419,6 @@ def update_table(filtered_user_ids, reg_start, reg_end, act_start, act_end,
     # Update page display
     page_display = f"Page {page_number:,} of {total_pages:,}"
     
-    print(f"Returning {len(table_rows)} rows, total records: {total_records}")
     return table_rows, page_display, page_number, total_records
 
 
@@ -1506,8 +1470,6 @@ EXPORT_COLUMNS = {
 def export_selected_rows(n_clicks, selected_user_ids):
     if not n_clicks or not selected_user_ids:
         return None, False
-
-    print(f"Exporting data for {len(selected_user_ids)} selected users")
     
     try:
         # Load the full dataset
@@ -1521,7 +1483,6 @@ def export_selected_rows(n_clicks, selected_user_ids):
         df_selected = df[df['user_id'].isin(selected_user_ids)]
         
         if df_selected.empty:
-            print("No data to export")
             return None, False
 
         # Format dates
@@ -1539,7 +1500,6 @@ def export_selected_rows(n_clicks, selected_user_ids):
         ), True
         
     except Exception as e:
-        print(f"Error exporting data: {str(e)}")
         return None, False
 
 
@@ -1600,9 +1560,6 @@ def reset_filters(reset_clicks, clear_reg_clicks, clear_act_clicks, reg_start_da
     min_act_date = df['activity_week'].min().date().isoformat()
     max_act_date = df['activity_week'].max().date().isoformat()
 
-    print(f"Min reg date: {min_reg_date}, Max reg date: {max_reg_date}")
-    print(f"Min act date: {min_act_date}, Max act date: {max_act_date}")
-
     if button_id == 'reset-filters-button':
         return [
             min_reg_date, max_reg_date,  # registration date range
@@ -1649,12 +1606,10 @@ def reload_data(n_clicks):
         return dash.no_update, dash.no_update, dash.no_update
         
     try:
-        print("\n=== Reloading data ===")
         df = load_data(force_reload=True)  # Add force_reload parameter to load_data
         user_ids = df['user_id'].astype(str).tolist()
         return user_ids, user_ids, True
     except Exception as e:
-        print(f"Error reloading data: {str(e)}")
         return dash.no_update, dash.no_update, False
 
 

@@ -54,6 +54,9 @@ def main():
     query_ids = config['query_ids']
     output_folder = config['output_folder']
 
+    # Ensure output folder exists
+    os.makedirs(output_folder, exist_ok=True)
+
     csv_files = {}
     for key, query_id in query_ids.items():
         print(f"Executing {key} (Query ID: {query_id})")
@@ -63,60 +66,19 @@ def main():
         download_query_result(base_url, query_result_id, api_key, output_csv_file)
         csv_files[key] = output_csv_file
 
-    # Merge the CSV files
-    join_file = os.path.join(output_folder, 'join_result.csv')
-    print(f"Merging CSV files into {join_file}")
+    # Get fixed_output_csv path from config
+    fixed_output_csv = config.get('fixed_output_csv', './join_result.csv')
+    print(f"Merging CSV files into {fixed_output_csv}")
     
+    # Merge the CSV files
     join_csv_files(
         csv_files['query_1'],
         csv_files['query_2'],
         csv_files['query_3'],
-        join_file
+        fixed_output_csv
     )
 
-    # Convert the merged CSV to Parquet format
-    join_parquet_file = os.path.join(output_folder, 'join_result.parquet')
-    print(f"Converting {join_file} to Parquet format at {join_parquet_file}")
-    
-    # Load the merged CSV into a DataFrame
-    df = pd.read_csv(
-        join_file,
-        dtype={
-            'user_id': 'Int64',
-            'activity_week': 'string',
-            'full_name': 'string',
-            'username': 'string',
-            'country': 'string',
-            'profile_url': 'string',
-            'user_type': 'category',
-            'registration_date': 'string',
-            'social_links': 'string',
-            'membership': 'category',
-            'avg_lai_score': 'float64',
-            'exclusivity_rate': 'float64',
-            'acceptance_rate': 'float64',
-            'num_of_photos_featured': 'Int64',
-            'num_of_galleries_featured': 'Int64',
-            'num_of_stories_featured': 'Int64',
-            'df2_total_uploads': 'Int64',
-            'df2_total_licensing_submissions': 'Int64',
-            'df2_total_sales_revenue': 'float64',
-            'df2_total_num_of_sales': 'Int64',
-            'df3_photo_likes': 'Int64',
-            'df3_comments': 'Int64',
-            'df3_avg_visit_days_monthly': 'float64',
-            'df3_avg_aesthetic_score': 'float64'
-        }
-    )
-    
-    # Save as Parquet
-    df.to_parquet(join_parquet_file, index=False, engine='pyarrow')
-
-    # Optionally copy the Parquet file to a fixed location for the app to read from
-    fixed_output_parquet = config.get('fixed_output_parquet', 'join_result.parquet')
-    shutil.copyfile(join_parquet_file, fixed_output_parquet)
-    
-    print(f"Parquet file saved to {fixed_output_parquet}")
+    print(f"CSV file saved to {fixed_output_csv}")
     print("Process completed successfully.")
 
 if __name__ == '__main__':

@@ -7,8 +7,8 @@
         "query_3": 6522
     },
     "output_folder": "./query_results",
-    "fixed_output_parquet": "./join_result.parquet",
-    "data_path": "./join_result.parquet",
+    "fixed_output_csv": "./join_result.csv",
+    "data_path": "./join_result.csv",
     "country_mappings_path": "./mappings/country_mappings.json",
     "region_mappings_path": "./mappings/region_mappings.json",
     "debug": false,

@@ -1,5 +1,6 @@
 query_results/
 join_result.parquet
+*.csv
 test_redash.py
 backups/
 .vscode/
