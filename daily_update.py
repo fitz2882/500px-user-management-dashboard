@@ -32,12 +32,22 @@ def execute_query(base_url, query_id, api_key):
         raise Exception("Query execution failed")
 
 def download_query_result(base_url, query_result_id, api_key, output_csv_file):
-    url = f"{base_url}/api/query_results/{query_result_id}.csv"
-    headers = {'Authorization': f'Key {api_key}'}
+    url = f"{base_url}/api/query_results/{query_result_id}"
+    headers = {
+        'Authorization': f'Key {api_key}',
+    }
     response = requests.get(url, headers=headers)
     response.raise_for_status()
-    with open(output_csv_file, 'wb') as f:
-        f.write(response.content)
+    
+    # Parse JSON response
+    data = response.json()
+    
+    # Convert to DataFrame and save as CSV
+    if 'query_result' in data and 'data' in data['query_result']:
+        df = pd.DataFrame(data['query_result']['data']['rows'])
+        df.to_csv(output_csv_file, index=False)
+    else:
+        raise ValueError("Unexpected response format from API")
 
 def main():
     load_dotenv()
@@ -66,20 +76,34 @@ def main():
         download_query_result(base_url, query_result_id, api_key, output_csv_file)
         csv_files[key] = output_csv_file
 
+    # Add file existence checks before merge
+    for file_path in csv_files.values():
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Required CSV file not found: {file_path}")
+    
     # Get fixed_output_csv path from config
     fixed_output_csv = config.get('fixed_output_csv', './join_result.csv')
     print(f"Merging CSV files into {fixed_output_csv}")
     
-    # Merge the CSV files
-    join_csv_files(
-        csv_files['query_1'],
-        csv_files['query_2'],
-        csv_files['query_3'],
-        fixed_output_csv
-    )
-
-    print(f"CSV file saved to {fixed_output_csv}")
-    print("Process completed successfully.")
+    try:
+        # Merge the CSV files
+        join_csv_files(
+            csv_files['query_1'],
+            csv_files['query_2'],
+            csv_files['query_3'],
+            fixed_output_csv
+        )
+        print(f"CSV file saved to {fixed_output_csv}")
+        print("Process completed successfully.")
+    except KeyboardInterrupt:
+        print("\nProcess interrupted by user. Cleaning up...")
+        # Optionally clean up incomplete output file
+        if os.path.exists(fixed_output_csv):
+            os.remove(fixed_output_csv)
+        raise
+    except Exception as e:
+        print(f"Error during file merge: {str(e)}")
+        raise
 
 if __name__ == '__main__':
     main()
