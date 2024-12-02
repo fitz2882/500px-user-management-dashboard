@@ -33,10 +33,48 @@ def join_csv_files(csv_file_1, csv_file_2, csv_file_3, output_file):
     df_merged = pd.merge(df1, df2, on=['user_id', 'activity_week'], how='outer')
     df_merged = pd.merge(df_merged, df3, on=['user_id', 'activity_week'], how='outer')
 
-    # Create DataFrames without 'activity_week' to fill missing data
-    df1_user = df1.drop(columns=['activity_week']).drop_duplicates(subset=['user_id'])
-    df2_user = df2.drop(columns=['activity_week']).drop_duplicates(subset=['user_id'])
-    df3_user = df3.drop(columns=['activity_week']).drop_duplicates(subset=['user_id'])
+    # Define which columns are user averages/characteristics (don't change week to week)
+    user_level_columns = {
+        'df1': [
+            'full_name',
+            'username',
+            'user_type',
+            'registration_date',
+            'membership',
+            'country',
+            'profile_url',
+            'social_links',
+            'avg_lai_score',
+            'exclusivity_rate',
+            'acceptance_rate'
+        ],
+        'df2': [],
+        'df3': [
+            'df3_avg_aesthetic_score',
+            'df3_avg_visit_days_monthly'
+        ]
+    }
+
+    # For reference, these are weekly activity metrics (should NOT be propagated):
+    # - num_of_photos_featured
+    # - num_of_galleries_featured
+    # - num_of_stories_featured
+    # - df2_total_uploads
+    # - df2_total_licensing_submissions
+    # - df2_total_sales_revenue
+    # - df2_total_num_of_sales
+    # - df3_photo_likes
+    # - df3_comments
+
+    # Create DataFrames without 'activity_week' to fill missing data, but only for user averages
+    # Add check for column existence
+    df1_columns = ['user_id'] + [col for col in user_level_columns['df1'] if col in df1.columns]
+    df2_columns = ['user_id'] + [col for col in user_level_columns['df2'] if col in df2.columns]
+    df3_columns = ['user_id'] + [col for col in user_level_columns['df3'] if col in df3.columns]
+
+    df1_user = df1[df1_columns].drop_duplicates(subset=['user_id'])
+    df2_user = df2[df2_columns].drop_duplicates(subset=['user_id'])
+    df3_user = df3[df3_columns].drop_duplicates(subset=['user_id'])
 
     # Set 'user_id' as index for updating
     df_merged.set_index('user_id', inplace=True)
@@ -44,7 +82,7 @@ def join_csv_files(csv_file_1, csv_file_2, csv_file_3, output_file):
     df2_user.set_index('user_id', inplace=True)
     df3_user.set_index('user_id', inplace=True)
 
-    # Update df_merged with user-level data
+    # Update df_merged with user-level data only
     df_merged.update(df1_user, overwrite=False)
     df_merged.update(df2_user, overwrite=False)
     df_merged.update(df3_user, overwrite=False)

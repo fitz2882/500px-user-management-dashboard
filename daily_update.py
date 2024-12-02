@@ -8,46 +8,39 @@ from merge_utils import join_csv_files
 import pandas as pd
 import shutil 
 
-def execute_query(base_url, query_id, api_key):
-    url = f"{base_url}/api/queries/{query_id}/refresh"
-    headers = {'Authorization': f'Key {api_key}'}
-    response = requests.post(url, headers=headers)
-    response.raise_for_status()
-
-    job = response.json()['job']
-
-    # Poll for the job status
-    while job['status'] not in (3, 4):
-        time.sleep(5)
-        job_response = requests.get(f"{base_url}/api/jobs/{job['id']}", headers=headers)
-        job_response.raise_for_status()
-        job = job_response.json()['job']
-
-    if job['status'] == 3:
-        # Job completed
-        query_result_id = job['query_result_id']
-        return query_result_id
-    else:
-        # Job failed
-        raise Exception("Query execution failed")
-
-def download_query_result(base_url, query_result_id, api_key, output_csv_file):
-    url = f"{base_url}/api/query_results/{query_result_id}"
-    headers = {
-        'Authorization': f'Key {api_key}',
-    }
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    
-    # Parse JSON response
-    data = response.json()
-    
-    # Convert to DataFrame and save as CSV
-    if 'query_result' in data and 'data' in data['query_result']:
-        df = pd.DataFrame(data['query_result']['data']['rows'])
-        df.to_csv(output_csv_file, index=False)
-    else:
-        raise ValueError("Unexpected response format from API")
+def download_query_result(base_url, query_result_id, api_key, output_csv_file, max_retries=3, retry_delay=5):
+    for attempt in range(max_retries):
+        try:
+            url = f"{base_url}/api/query_results/{query_result_id}"
+            headers = {
+                'Authorization': f'Key {api_key}',
+            }
+            print(f"Attempt {attempt + 1}/{max_retries} to download query result")
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            
+            # Parse JSON response
+            data = response.json()
+            
+            # Convert to DataFrame and save as CSV
+            if 'query_result' in data and 'data' in data['query_result']:
+                df = pd.DataFrame(data['query_result']['data']['rows'])
+                df.to_csv(output_csv_file, index=False)
+                return
+            else:
+                raise ValueError("Unexpected response format from API")
+                
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 502 and attempt < max_retries - 1:
+                print(f"Got 502 error, retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                continue
+            else:
+                print(f"Failed to download after {attempt + 1} attempts")
+                raise
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            raise
 
 def main():
     load_dotenv()
@@ -69,8 +62,16 @@ def main():
 
     csv_files = {}
     for key, query_id in query_ids.items():
-        print(f"Executing {key} (Query ID: {query_id})")
-        query_result_id = execute_query(base_url, query_id, api_key)
+        print(f"Downloading results for {key} (Query ID: {query_id})")
+        # Get the latest query result directly
+        url = f"{base_url}/api/queries/{query_id}"
+        headers = {'Authorization': f'Key {api_key}'}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        # Extract the latest query result ID
+        query_result_id = response.json()['latest_query_data_id']
+        
         output_csv_file = os.path.join(output_folder, f"{key}.csv")
         print(f"Downloading result to {output_csv_file}")
         download_query_result(base_url, query_result_id, api_key, output_csv_file)
