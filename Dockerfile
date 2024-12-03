@@ -1,16 +1,18 @@
-FROM ubuntu:24.04
+FROM python:3.13-slim
 
-WORKDIR /application/
+WORKDIR /application
 
-COPY ./application requirements.txt start.sh /application/
+COPY requirements.txt ./
 
 RUN apt update \
     && apt install -y nginx \
-    && apt install -y pip \
-    && pip install -r requirements.txt --break-system-packages
+    && pip install --upgrade setuptools \
+    && pip install --no-cache-dir -r requirements.txt
+
+COPY ./application entrypoint.sh ./
 
 RUN rm -rf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/
 COPY nginx-app.conf /etc/nginx/conf.d/
 
-CMD sh start.sh
+ENTRYPOINT ["./entrypoint.sh"]
