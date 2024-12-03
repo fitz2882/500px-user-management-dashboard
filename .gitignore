@@ -27,3 +27,6 @@ venv/
 *.cache/
 cache/
 logs/
+
+# IDE
+.idea
