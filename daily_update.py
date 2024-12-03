@@ -14,6 +14,7 @@ def download_query_result(base_url, query_result_id, api_key, output_csv_file, m
             url = f"{base_url}/api/query_results/{query_result_id}"
             headers = {
                 'Authorization': f'Key {api_key}',
+                'Content-Type': 'text/csv',
             }
             print(f"Attempt {attempt + 1}/{max_retries} to download query result")
             response = requests.get(url, headers=headers)
