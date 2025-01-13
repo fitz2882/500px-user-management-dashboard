@@ -2,8 +2,8 @@
     "redash_base_url": "https://redash.j79-prod.500px.net",
     "api_key": "",
     "query_ids": {
-        "query_1": 6520,
-        "query_2": 6521,
+        "query_1": 6606,
+        "query_2": 6605,
         "query_3": 6522
     },
     "output_folder": "./query_results",

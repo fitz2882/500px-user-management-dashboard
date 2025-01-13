@@ -1,106 +1,137 @@
 def join_csv_files(csv_file_1, csv_file_2, csv_file_3, output_file):
     import pandas as pd
+    pd.set_option('future.no_silent_downcasting', True)
 
-    # Load CSV files into DataFrames
-    df1 = pd.read_csv(csv_file_1)
-    df2 = pd.read_csv(csv_file_2)
-    df3 = pd.read_csv(csv_file_3)
+    try:
+        # Load CSV files into DataFrames
+        print("Loading CSV files...")
+        df1 = pd.read_csv(csv_file_1)  # Weekly activity metrics
+        df2 = pd.read_csv(csv_file_2)  # User profile data
+        df3 = pd.read_csv(csv_file_3)  # Additional weekly metrics
 
-    # Standardize column names (trim whitespaces and convert to lowercase)
-    for df in [df1, df2, df3]:
-        df.columns = df.columns.str.strip().str.lower()
+        print(f"Loaded data shapes - df1: {df1.shape}, df2: {df2.shape}, df3: {df3.shape}")
 
-    # Ensure 'user_id' is a string in all DataFrames
-    for df in [df1, df2, df3]:
-        df['user_id'] = df['user_id'].astype(str).str.strip()
+        # Standardize column names (trim whitespaces and convert to lowercase)
+        for df in [df1, df2, df3]:
+            df.columns = df.columns.str.strip().str.lower()
+            df['user_id'] = df['user_id'].astype(str).str.strip()
 
-    # Process 'activity_week' column
-    for df in [df1, df2, df3]:
-        if 'activity_week' in df.columns:
-            df['activity_week'] = pd.to_datetime(df['activity_week'], errors='coerce').dt.strftime('%Y-%m-%d')
-            df['activity_week'] = df['activity_week'].fillna('')
-        else:
-            df['activity_week'] = ''
+        # Process 'activity_week' column
+        for df in [df1, df3]:
+            if 'activity_week' in df.columns:
+                df['activity_week'] = pd.to_datetime(df['activity_week'], errors='coerce').dt.strftime('%Y-%m-%d')
+                df['activity_week'] = df['activity_week'].fillna('')
 
-    # Rename columns in df2 and df3 to prevent overlaps
-    df2_columns_to_rename = {col: f'df2_{col}' for col in df2.columns if col not in ['user_id', 'activity_week']}
-    df2.rename(columns=df2_columns_to_rename, inplace=True)
+        # Rename df2 columns to add prefix
+        df2_columns_to_rename = {
+            col: f'df2_{col}' for col in df2.columns 
+            if col not in ['user_id']
+        }
+        df2.rename(columns=df2_columns_to_rename, inplace=True)
 
-    df3_columns_to_rename = {col: f'df3_{col}' for col in df3.columns if col not in ['user_id', 'activity_week']}
-    df3.rename(columns=df3_columns_to_rename, inplace=True)
+        # Rename df3 columns to add prefix
+        df3_columns_to_rename = {
+            col: f'df3_{col}' for col in df3.columns 
+            if col not in ['user_id', 'activity_week']
+        }
+        df3.rename(columns=df3_columns_to_rename, inplace=True)
 
-    # Merge on 'user_id' and 'activity_week' using outer joins
-    df_merged = pd.merge(df1, df2, on=['user_id', 'activity_week'], how='outer')
-    df_merged = pd.merge(df_merged, df3, on=['user_id', 'activity_week'], how='outer')
+        print("Getting unique weeks...")
+        # Get all unique user_id and activity_week combinations
+        weeks_df1 = df1[['user_id', 'activity_week']].copy()
+        weeks_df3 = df3[['user_id', 'activity_week']].copy()
+        all_weeks = pd.concat([weeks_df1, weeks_df3]).drop_duplicates()
+        print(f"Total unique week combinations: {len(all_weeks)}")
 
-    # Define which columns are user averages/characteristics (don't change week to week)
-    user_level_columns = {
-        'df1': [
-            'full_name',
-            'username',
-            'user_type',
-            'registration_date',
-            'membership',
-            'country',
-            'profile_url',
-            'social_links',
-            'avg_lai_score',
-            'exclusivity_rate',
-            'acceptance_rate'
-        ],
-        'df2': [],
-        'df3': [
-            'df3_avg_aesthetic_score',
-            'df3_avg_visit_days_monthly'
+        print("Merging data...")
+        # Get user profile data
+        user_profiles = df2.copy()
+
+        # Merge all weeks with user profiles
+        df_merged = pd.merge(all_weeks, user_profiles, on='user_id', how='left')
+        print(f"After profile merge: {df_merged.shape}")
+
+        # Merge with df1 for activity metrics
+        df_merged = pd.merge(
+            df_merged,
+            df1,
+            on=['user_id', 'activity_week'],
+            how='left'
+        )
+        print(f"After df1 merge: {df_merged.shape}")
+
+        # Merge with df3 for additional metrics
+        df_merged = pd.merge(
+            df_merged,
+            df3,
+            on=['user_id', 'activity_week'],
+            how='left'
+        )
+        print(f"After df3 merge: {df_merged.shape}")
+
+        print("Filling missing values...")
+        # Fill activity metrics with 0
+        activity_columns = [
+            'total_uploads', 'total_licensing_submissions', 'total_sales_revenue',
+            'total_num_of_sales', 'num_of_photos_featured', 'num_of_galleries_featured',
+            'num_of_stories_featured', 'df3_photo_likes', 'df3_comments'
         ]
-    }
+        
+        for col in activity_columns:
+            if col in df_merged.columns:
+                df_merged[col] = df_merged[col].fillna(0)
 
-    # For reference, these are weekly activity metrics (should NOT be propagated):
-    # - num_of_photos_featured
-    # - num_of_galleries_featured
-    # - num_of_stories_featured
-    # - df2_total_uploads
-    # - df2_total_licensing_submissions
-    # - df2_total_sales_revenue
-    # - df2_total_num_of_sales
-    # - df3_photo_likes
-    # - df3_comments
+        # Forward fill user profile data
+        profile_columns = [
+            'df2_full_name', 'df2_username', 'df2_user_type', 'df2_registration_date',
+            'df2_membership', 'df2_country', 'df2_profile_url', 'df2_social_links',
+            'df2_avg_lai_score', 'df2_exclusivity_rate', 'df2_acceptance_rate',
+            'df3_avg_visit_days_monthly', 'df3_avg_aesthetic_score'
+        ]
 
-    # Create DataFrames without 'activity_week' to fill missing data, but only for user averages
-    # Add check for column existence
-    df1_columns = ['user_id'] + [col for col in user_level_columns['df1'] if col in df1.columns]
-    df2_columns = ['user_id'] + [col for col in user_level_columns['df2'] if col in df2.columns]
-    df3_columns = ['user_id'] + [col for col in user_level_columns['df3'] if col in df3.columns]
+        print("Forward filling profile data...")
+        # Group by user_id and forward fill profile data
+        df_merged = df_merged.sort_values(['user_id', 'activity_week'])
+        
+        # Process profile columns in chunks for better performance
+        chunk_size = 5
+        for i in range(0, len(profile_columns), chunk_size):
+            chunk = profile_columns[i:i + chunk_size]
+            print(f"Processing columns {i+1}-{min(i+chunk_size, len(profile_columns))} of {len(profile_columns)}")
+            
+            existing_columns = [col for col in chunk if col in df_merged.columns]
+            if existing_columns:
+                # Store the user_id column
+                user_id_col = df_merged['user_id'].copy()
+                
+                # Perform the forward/backward fill
+                filled_data = df_merged.groupby('user_id')[existing_columns].transform('ffill')
+                filled_data = filled_data.groupby(user_id_col).transform('bfill')
+                
+                # Update only the filled columns
+                df_merged[existing_columns] = filled_data
 
-    df1_user = df1[df1_columns].drop_duplicates(subset=['user_id'])
-    df2_user = df2[df2_columns].drop_duplicates(subset=['user_id'])
-    df3_user = df3[df3_columns].drop_duplicates(subset=['user_id'])
+        print("Removing blank activity weeks...")
+        # Remove rows where activity_week is blank
+        df_merged = df_merged[df_merged['activity_week'].notna() & (df_merged['activity_week'] != '')]
 
-    # Set 'user_id' as index for updating
-    df_merged.set_index('user_id', inplace=True)
-    df1_user.set_index('user_id', inplace=True)
-    df2_user.set_index('user_id', inplace=True)
-    df3_user.set_index('user_id', inplace=True)
+        print("Final sorting...")
+        # Sort by user_id (numerically) and activity_week
+        df_merged['user_id'] = pd.to_numeric(df_merged['user_id'])
+        df_merged = df_merged.sort_values(['user_id', 'activity_week'])
+        df_merged['user_id'] = df_merged['user_id'].astype(str)
 
-    # Update df_merged with user-level data only
-    df_merged.update(df1_user, overwrite=False)
-    df_merged.update(df2_user, overwrite=False)
-    df_merged.update(df3_user, overwrite=False)
+        print("Saving results...")
+        # Save the joined DataFrame to CSV
+        df_merged.to_csv(output_file, index=False)
+        print(f"Join results saved to {output_file}")
 
-    # Reset index to bring 'user_id' back as a column
-    df_merged.reset_index(inplace=True)
+        print("\nFinal columns:", df_merged.columns.tolist())
+        print("\nSample data:")
+        print(df_merged[df_merged['user_id'] == '233'].sort_values('activity_week'))
 
-    # Fill NaN values with zeros or appropriate defaults
-    df_merged.fillna(0, inplace=True)
-
-    # Filter out rows with blank activity_week
-    df_merged = df_merged[df_merged['activity_week'].notna() & (df_merged['activity_week'] != '')]
-    print("Removed rows with blank activity_week values")
-
-    # Save the joined DataFrame to CSV
-    df_merged.to_csv(output_file, index=False)
-    print(f"Join results saved to {output_file}")
-
-    # Debugging: print sample data
-    print("\nSample data from df_merged:")
-    print(df_merged.head())
+    except Exception as e:
+        print(f"Error during merge process: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        raise

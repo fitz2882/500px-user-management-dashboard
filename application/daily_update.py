@@ -8,7 +8,7 @@ from merge_utils import join_csv_files
 import pandas as pd
 import shutil 
 
-def download_query_result(base_url, query_result_id, api_key, output_csv_file, max_retries=5, retry_delay=2):
+def download_query_result(base_url, query_result_id, api_key, output_csv_file, max_retries=10, retry_delay=10):
     for attempt in range(max_retries):
         try:
             url = f"{base_url}/api/query_results/{query_result_id}"

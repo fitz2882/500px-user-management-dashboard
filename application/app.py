@@ -58,7 +58,7 @@ region_options = None
 membership_options = None
 data_lock = Lock()
 
-os.makedirs(os.path.dirname(config.get('data_path', './data/join_result.csv')), exist_ok=True)
+os.makedirs(os.path.dirname(config.get('data_path', './join_result.csv')), exist_ok=True)
 
 # Helper functions
 @cache.memoize(timeout=300)
@@ -86,21 +86,17 @@ def load_data(force_reload=False):
 
                 # Process data 
                 df['activity_week'] = df['activity_week'].replace(['0', '', pd.NA, 'NaT'], pd.NaT)
-                df['registration_date'] = df['registration_date'].replace(['0', '', pd.NA, 'NaT'], pd.NaT)
+                df['df2_registration_date'] = df['df2_registration_date'].replace(['0', '', pd.NA, 'NaT'], pd.NaT)
 
                 # Specify the date format explicitly
                 date_format = '%Y-%m-%d'
 
                 # Parse date columns with the specified format
-                df['registration_date'] = pd.to_datetime(df['registration_date'], format=date_format, errors='coerce')
-                df['activity_week'] = pd.to_datetime(df['activity_week'], format=date_format, errors='coerce')
-
-                # Normalize the timestamps to remove the time component
-                df['registration_date'] = df['registration_date'].dt.normalize()
-                df['activity_week'] = df['activity_week'].dt.normalize()
+                df['df2_registration_date'] = pd.to_datetime(df['df2_registration_date'], format=date_format, errors='coerce').dt.date
+                df['activity_week'] = pd.to_datetime(df['activity_week'], format=date_format, errors='coerce').dt.date
 
                 # Exclude NaT values when calculating min and max dates
-                registration_dates = df['registration_date'].dropna()
+                registration_dates = df['df2_registration_date'].dropna()
                 activity_week_dates = df['activity_week'].dropna()
 
                 # Use these dates for DatePickerRange
@@ -110,9 +106,9 @@ def load_data(force_reload=False):
                 end_date_act = activity_week_dates.max()
 
                 # Clean country names
-                df['country'] = df['country'].str.strip()
-                df['country'] = df['country'].str.split(',').str[0]
-                df['country'] = df['country'].str.title()
+                df['df2_country'] = df['df2_country'].str.strip()
+                df['df2_country'] = df['df2_country'].str.split(',').str[0]
+                df['df2_country'] = df['df2_country'].str.title()
                 
                 # Load country mappings from JSON file
                 with open('country_mappings.json', 'r') as f:
@@ -120,7 +116,7 @@ def load_data(force_reload=False):
                 country_to_english = country_mappings
 
                 # Map other languages to English country names only if they exist in the dictionary
-                df['country'] = df['country'].apply(lambda x: country_to_english.get(x, x))
+                df['df2_country'] = df['df2_country'].apply(lambda x: country_to_english.get(x, x))
 
                 # Load region mappings from JSON file
                 with open('region_mappings.json', 'r') as f:
@@ -128,19 +124,22 @@ def load_data(force_reload=False):
                 country_to_region = region_mappings
 
                 # Map countries to regions
-                df['region'] = df['country'].map(country_to_region).fillna('Other')
+                df['region'] = df['df2_country'].map(country_to_region).fillna('Other')
                 df['region'] = df['region'].astype('category')
 
                 # Replace specific values with custom labels
-                df['country'] = df['country'].replace({'0': 'Unknown',
-                                                    '': 'Unknown'})
-                df['profile_url'] = df['profile_url'].replace({'0': ''})
-                df['social_links'] = df['social_links'].replace({'0': ''})
-                df['user_type'] = df['user_type'].replace({'0': 'Basic'})
+                df['df2_country'] = df['df2_country'].replace({'0': 'Unknown',
+                                                    '': 'Unknown',
+                                                    '-': 'Unknown'})
+                df['df2_profile_url'] = df['df2_profile_url'].replace({'0': ''})
+                df['df2_social_links'] = df['df2_social_links'].replace({'0': ''})
+                df['df2_user_type'] = df['df2_user_type'].replace({'0': 'Basic'})
 
                 # Replace specific values with custom labels before converting to categorical
-                df['membership'] = df['membership'].replace({
+                df['df2_membership'] = df['df2_membership'].replace({
                     '0': 'No membership',
+                    '': 'No membership',
+                    '-': 'No membership',
                     'Trial - Awesome Monthly - 30 Days': 'Trial - Awesome - M',
                     'Trial - Awesome Yearly - 30 Days': 'Trial - Awesome - Y',
                     'Trial - Pro Monthly - 30 Days': 'Trial - Pro - M',
@@ -148,28 +147,27 @@ def load_data(force_reload=False):
                 })
                 
                 # Get unique user records by grouping by user_id
-                df = df.groupby('user_id').agg({
-                    'activity_week': 'first',
-                    'full_name': 'first',
-                    'username': 'first',
-                    'user_type': 'first',
-                    'registration_date': 'first',
-                    'membership': 'first',
-                    'country': 'first',
+                df = df.groupby(['user_id', 'activity_week']).agg({
+                    'df2_full_name': 'first',
+                    'df2_username': 'first',
+                    'df2_user_type': 'first',
+                    'df2_registration_date': 'first',
+                    'df2_membership': 'first',
+                    'df2_country': 'first',
                     'region': 'first',
-                    'profile_url': 'first',
-                    'social_links': 'first',
+                    'df2_profile_url': 'first',
+                    'df2_social_links': 'first',
                     'df3_avg_aesthetic_score': 'mean',
-                    'avg_lai_score': 'mean',
-                    'exclusivity_rate': 'mean',
-                    'acceptance_rate': 'mean',
+                    'df2_avg_lai_score': 'mean',
+                    'df2_exclusivity_rate': 'mean',
+                    'df2_acceptance_rate': 'mean',
                     'num_of_photos_featured': 'sum',
                     'num_of_galleries_featured': 'sum',
                     'num_of_stories_featured': 'sum',
-                    'df2_total_uploads': 'sum',
-                    'df2_total_licensing_submissions': 'sum',
-                    'df2_total_sales_revenue': 'sum',
-                    'df2_total_num_of_sales': 'sum',
+                    'total_uploads': 'sum',
+                    'total_licensing_submissions': 'sum',
+                    'total_sales_revenue': 'sum',
+                    'total_num_of_sales': 'sum',
                     'df3_photo_likes': 'sum',
                     'df3_comments': 'sum',
                     'df3_avg_visit_days_monthly': 'mean'
@@ -177,7 +175,7 @@ def load_data(force_reload=False):
 
     
                 # Convert 'membership' column to categorical after replacement
-                df['membership'] = df['membership'].astype('category')
+                df['df2_membership'] = df['df2_membership'].astype('category')
 
                 # Define custom sort order
                 custom_membership_order = ['No membership', 'Awesome - Monthly', 'Awesome - Yearly', 'Pro - Monthly', 'Pro - Yearly',
@@ -191,8 +189,8 @@ def load_data(force_reload=False):
 
                 # Precompute options for dropdowns
                 user_type_options = [
-                    {'label': user_type, 'value': user_type} 
-                    for user_type in sorted(df['user_type'].unique())
+                    {'label': df2_user_type, 'value': df2_user_type} 
+                    for df2_user_type in sorted(df['df2_user_type'].unique())
                 ]
 
                 region_options = [
@@ -201,8 +199,8 @@ def load_data(force_reload=False):
                 ]
 
                 membership_options = [
-                    {'label': membership, 'value': membership}
-                    for membership in sorted(df['membership'].unique(), key=lambda x: custom_membership_order.index(x) if x in custom_membership_order else len(custom_membership_order))
+                    {'label': df2_membership, 'value': df2_membership}
+                    for df2_membership in sorted(df['df2_membership'].fillna('No membership').unique(), key=lambda x: custom_membership_order.index(x) if x in custom_membership_order else len(custom_membership_order))
                 ]
                 
             return df
@@ -218,26 +216,26 @@ def create_empty_dataframe():
     return pd.DataFrame({
         'user_id': [],
         'activity_week': [],
-        'full_name': [],
-        'username': [],
-        'user_type': [],
-        'registration_date': [],
-        'membership': [],
-        'country': [],
+        'df2_full_name': [],
+        'df2_username': [],
+        'df2_user_type': [],
+        'df2_registration_date': [],
+        'df2_membership': [],
+        'df2_country': [],
         'region': [],
-        'profile_url': [],
-        'social_links': [],
+        'df2_profile_url': [],
+        'df2_social_links': [],
         'df3_avg_aesthetic_score': [],
-        'avg_lai_score': [],
-        'exclusivity_rate': [],
-        'acceptance_rate': [],
+        'df2_avg_lai_score': [],
+        'df2_exclusivity_rate': [],
+        'df2_acceptance_rate': [],
         'num_of_photos_featured': [],
         'num_of_galleries_featured': [],
         'num_of_stories_featured': [],
-        'df2_total_uploads': [],
-        'df2_total_licensing_submissions': [],
-        'df2_total_sales_revenue': [],
-        'df2_total_num_of_sales': [],
+        'total_uploads': [],
+        'total_licensing_submissions': [],
+        'total_sales_revenue': [],
+        'total_num_of_sales': [],
         'df3_photo_likes': [],
         'df3_comments': [],
         'df3_avg_visit_days_monthly': []
@@ -262,8 +260,8 @@ def create_table_row(row, is_selected, row_number):
     
     # Format profile URLs - split by comma and create multiple links
     profile_links = []
-    if row['profile_url']:
-        urls = str(row['profile_url']).split(',')
+    if row['df2_profile_url']:
+        urls = str(row['df2_profile_url']).split(',')
         profile_links = [
             html.A(url.strip(), href=validate_and_format_url(url.strip()), target='_blank')
             for url in urls if url.strip()
@@ -273,8 +271,8 @@ def create_table_row(row, is_selected, row_number):
     
     # Format social links - split by comma and create multiple links
     social_links = []
-    if row['social_links']:
-        urls = str(row['social_links']).split(',')
+    if row['df2_social_links']:
+        urls = str(row['df2_social_links']).split(',')
         social_links = [
             html.A(url.strip(), href=validate_and_format_url(url.strip()), target='_blank')
             for url in urls if url.strip()
@@ -283,7 +281,7 @@ def create_table_row(row, is_selected, row_number):
     social_cell = html.Td(social_links if social_links else '-', style={'textAlign': 'left'})
     
     # Format dates
-    reg_date = row['registration_date'].strftime('%Y-%m-%d') if pd.notnull(row['registration_date']) else '-'
+    reg_date = row['df2_registration_date'].strftime('%Y-%m-%d') if pd.notnull(row['df2_registration_date']) else '-'
     
     return html.Tr([
         html.Td(row_number, style={'textAlign': 'center'}),
@@ -294,23 +292,23 @@ def create_table_row(row, is_selected, row_number):
             style={'margin': '0', 'padding': '0'}
         ), style={'textAlign': 'center'}),
         html.Td(row['user_id'], style={'textAlign': 'center'}),
-        html.Td(row['username'] or '-', style={'textAlign': 'left'}),
-        html.Td(row['full_name'] or '-', style={'textAlign': 'left'}),
-        html.Td(row['user_type'] or '-', style={'textAlign': 'center'}),
+        html.Td(row['df2_username'] or '-', style={'textAlign': 'left'}),
+        html.Td(row['df2_full_name'] or '-', style={'textAlign': 'left'}),
+        html.Td(row['df2_user_type'] or '-', style={'textAlign': 'center'}),
         html.Td(reg_date, style={'textAlign': 'center'}),
-        html.Td(row['membership'] or '-', style={'textAlign': 'center'}),
-        html.Td(row['country'] or '-', style={'textAlign': 'center'}),
+        html.Td(row['df2_membership'] or '-', style={'textAlign': 'center'}),
+        html.Td(row['df2_country'] or '-', style={'textAlign': 'center'}),
         html.Td(row['region'] or '-', style={'textAlign': 'center'}),
         profile_cell,
         social_cell,
-        html.Td(f"{row['df2_total_uploads']:,.0f}" if pd.notnull(row['df2_total_uploads']) else '-', style={'textAlign': 'center'}),
-        html.Td(f"{row['df2_total_licensing_submissions']:,.0f}" if pd.notnull(row['df2_total_licensing_submissions']) else '-', style={'textAlign': 'center'}),
+        html.Td(f"{row['total_uploads']:,.0f}" if pd.notnull(row['total_uploads']) else '-', style={'textAlign': 'center'}),
+        html.Td(f"{row['total_licensing_submissions']:,.0f}" if pd.notnull(row['total_licensing_submissions']) else '-', style={'textAlign': 'center'}),
         html.Td(f"{row['df3_avg_aesthetic_score']:.2f}" if pd.notnull(row['df3_avg_aesthetic_score']) else '-', style={'textAlign': 'center'}),
-        html.Td(f"{row['avg_lai_score']:.2f}" if pd.notnull(row['avg_lai_score']) else '-', style={'textAlign': 'center'}),
-        html.Td(f"{row['exclusivity_rate']:.2f}%" if pd.notnull(row['exclusivity_rate']) else '-', style={'textAlign': 'center'}),
-        html.Td(f"{row['acceptance_rate']:.2f}%" if pd.notnull(row['acceptance_rate']) else '-', style={'textAlign': 'center'}),
-        html.Td(f"{row['df2_total_num_of_sales']:,.0f}" if pd.notnull(row['df2_total_num_of_sales']) else '-', style={'textAlign': 'center'}),
-        html.Td(f"${row['df2_total_sales_revenue']:,.2f}" if pd.notnull(row['df2_total_sales_revenue']) else '-', style={'textAlign': 'center'}),
+        html.Td(f"{row['df2_avg_lai_score']:.2f}" if pd.notnull(row['df2_avg_lai_score']) else '-', style={'textAlign': 'center'}),
+        html.Td(f"{row['df2_exclusivity_rate']:.2f}%" if pd.notnull(row['df2_exclusivity_rate']) else '-', style={'textAlign': 'center'}),
+        html.Td(f"{row['df2_acceptance_rate']:.2f}%" if pd.notnull(row['df2_acceptance_rate']) else '-', style={'textAlign': 'center'}),
+        html.Td(f"{row['total_num_of_sales']:,.0f}" if pd.notnull(row['total_num_of_sales']) else '-', style={'textAlign': 'center'}),
+        html.Td(f"${row['total_sales_revenue']:,.2f}" if pd.notnull(row['total_sales_revenue']) else '-', style={'textAlign': 'center'}),
         html.Td(f"{row['df3_photo_likes']:,.0f}" if pd.notnull(row['df3_photo_likes']) else '-', style={'textAlign': 'center'}),
         html.Td(f"{row['df3_comments']:,.0f}" if pd.notnull(row['df3_comments']) else '-', style={'textAlign': 'center'}),
         html.Td(f"{row['df3_avg_visit_days_monthly']:.0f}" if pd.notnull(row['df3_avg_visit_days_monthly']) else '-', style={'textAlign': 'center'}),
@@ -474,19 +472,19 @@ app.layout = dbc.Container([
                                 id='sort-by-dropdown',
                                 options=[
                                     {'label': 'User ID', 'value': 'user_id'},
-                                    {'label': 'User Type', 'value': 'user_type'},
-                                    {'label': 'Registration Date', 'value': 'registration_date'},
-                                    {'label': 'Membership', 'value': 'membership'},
-                                    {'label': 'Country', 'value': 'country'},
+                                    {'label': 'User Type', 'value': 'df2_user_type'},
+                                    {'label': 'Registration Date', 'value': 'df2_registration_date'},
+                                    {'label': 'Membership', 'value': 'df2_membership'},
+                                    {'label': 'Country', 'value': 'df2_country'},
                                     {'label': 'Region', 'value': 'region'},
-                                    {'label': 'Uploads', 'value': 'df2_total_uploads'},
-                                    {'label': 'Licensing Submissions', 'value': 'df2_total_licensing_submissions'},
+                                    {'label': 'Uploads', 'value': 'total_uploads'},
+                                    {'label': 'Licensing Submissions', 'value': 'total_licensing_submissions'},
                                     {'label': 'Avg Aesthetic Score', 'value': 'df3_avg_aesthetic_score'},
-                                    {'label': 'Avg LAI Score', 'value': 'avg_lai_score'},
-                                    {'label': 'Exclusivity Rate', 'value': 'exclusivity_rate'},
-                                    {'label': 'Acceptance Rate', 'value': 'acceptance_rate'},
-                                    {'label': 'Sales', 'value': 'df2_total_num_of_sales'},
-                                    {'label': 'Revenue', 'value': 'df2_total_sales_revenue'},
+                                    {'label': 'Avg LAI Score', 'value': 'df2_avg_lai_score'},
+                                    {'label': 'Exclusivity Rate', 'value': 'df2_exclusivity_rate'},
+                                    {'label': 'Acceptance Rate', 'value': 'df2_acceptance_rate'},
+                                    {'label': 'Sales', 'value': 'total_num_of_sales'},
+                                    {'label': 'Revenue', 'value': 'total_sales_revenue'},
                                     {'label': 'Likes', 'value': 'df3_photo_likes'},
                                     {'label': 'Comments', 'value': 'df3_comments'},
                                     {'label': 'Avg Visit Days', 'value': 'df3_avg_visit_days_monthly'},
@@ -1017,15 +1015,15 @@ def initialize_and_reset_data(pathname, reset_clicks, clear_reg_clicks, clear_ac
             return [], [], [], [], [], None, None, None, None
             
         # Get min/max dates from the data
-        min_reg_date = df['registration_date'].min().date().isoformat()
-        max_reg_date = df['registration_date'].max().date().isoformat()
-        min_act_date = df['activity_week'].min().date().isoformat()
-        max_act_date = df['activity_week'].max().date().isoformat()
+        min_reg_date = df['df2_registration_date'].min().isoformat()
+        max_reg_date = df['df2_registration_date'].max().isoformat()
+        min_act_date = df['activity_week'].min().isoformat()
+        max_act_date = df['activity_week'].max().isoformat()
         
         # Prepare dropdown options
-        user_type_options = [{'label': t, 'value': t} for t in sorted(df['user_type'].unique())]
-        region_options = [{'label': r, 'value': r} for r in sorted(df['region'].unique())]
-        membership_options = [{'label': m, 'value': m} for m in sorted(df['membership'].unique())]
+        user_type_options = [{'label': df2_user_type, 'value': df2_user_type} for df2_user_type in sorted(df['df2_user_type'].fillna('No user type').unique())]
+        region_options = [{'label': region, 'value': region} for region in sorted(df['region'].unique())]
+        membership_options = [{'label': df2_membership, 'value': df2_membership} for df2_membership in sorted(df['df2_membership'].fillna('No membership').unique())]
         
         # Handle different trigger cases
         if triggered_id == 'clear-registration-date':
@@ -1042,43 +1040,47 @@ def initialize_and_reset_data(pathname, reset_clicks, clear_reg_clicks, clear_ac
         mask = pd.Series(True, index=df.index)
         
         if reg_start and reg_end:
-            mask &= (df['registration_date'] >= reg_start) & (df['registration_date'] <= reg_end)
+            reg_start = pd.to_datetime(reg_start).date()
+            reg_end = pd.to_datetime(reg_end).date()
+            mask &= (df['df2_registration_date'] >= reg_start) & (df['df2_registration_date'] <= reg_end)
         if act_start and act_end:
+            act_start = pd.to_datetime(act_start).date()
+            act_end = pd.to_datetime(act_end).date()
             mask &= (df['activity_week'] >= act_start) & (df['activity_week'] <= act_end)
         if user_types:
-            mask &= df['user_type'].isin(user_types)
+            mask &= df['df2_user_type'].isin(user_types)
         if regions:
             mask &= df['region'].isin(regions)
         if membership_types:
-            mask &= df['membership'].isin(membership_types)
+            mask &= df['df2_membership'].isin(membership_types)
         if avg_aesthetic_score_range:
             mask &= (df['df3_avg_aesthetic_score'] >= avg_aesthetic_score_range[0]) & (df['df3_avg_aesthetic_score'] <= avg_aesthetic_score_range[1])
         if avg_lai_score_range:
-            mask &= (df['avg_lai_score'] >= avg_lai_score_range[0]) & (df['avg_lai_score'] <= avg_lai_score_range[1])
+            mask &= (df['df2_avg_lai_score'] >= avg_lai_score_range[0]) & (df['df2_avg_lai_score'] <= avg_lai_score_range[1])
         if exclusivity_rate_range:
-            mask &= (df['exclusivity_rate'] >= exclusivity_rate_range[0]) & (df['exclusivity_rate'] <= exclusivity_rate_range[1])
+            mask &= (df['df2_exclusivity_rate'] >= exclusivity_rate_range[0]) & (df['df2_exclusivity_rate'] <= exclusivity_rate_range[1])
         if acceptance_rate_range:
-            mask &= (df['acceptance_rate'] >= acceptance_rate_range[0]) & (df['acceptance_rate'] <= acceptance_rate_range[1])
+            mask &= (df['df2_acceptance_rate'] >= acceptance_rate_range[0]) & (df['df2_acceptance_rate'] <= acceptance_rate_range[1])
         if avg_visit_days_range:
             mask &= (df['df3_avg_visit_days_monthly'] >= avg_visit_days_range[0]) & (df['df3_avg_visit_days_monthly'] <= avg_visit_days_range[1])
             
         # Apply numeric filters
         if uploads_min is not None:
-            mask &= df['df2_total_uploads'] >= uploads_min
+            mask &= df['total_uploads'] >= uploads_min
         if uploads_max is not None:
-            mask &= df['df2_total_uploads'] <= uploads_max
+            mask &= df['total_uploads'] <= uploads_max
         if licensing_min is not None:
-            mask &= df['df2_total_licensing_submissions'] >= licensing_min
+            mask &= df['total_licensing_submissions'] >= licensing_min
         if licensing_max is not None:
-            mask &= df['df2_total_licensing_submissions'] <= licensing_max
+            mask &= df['total_licensing_submissions'] <= licensing_max
         if sales_min is not None:
-            mask &= df['df2_total_num_of_sales'] >= sales_min
+            mask &= df['total_num_of_sales'] >= sales_min
         if sales_max is not None:
-            mask &= df['df2_total_num_of_sales'] <= sales_max
+            mask &= df['total_num_of_sales'] <= sales_max
         if revenue_min is not None:
-            mask &= df['df2_total_sales_revenue'] >= revenue_min
+            mask &= df['total_sales_revenue'] >= revenue_min
         if revenue_max is not None:
-            mask &= df['df2_total_sales_revenue'] <= revenue_max
+            mask &= df['total_sales_revenue'] <= revenue_max
         if likes_min is not None:
             mask &= df['df3_photo_likes'] >= likes_min
         if likes_max is not None:
@@ -1100,16 +1102,88 @@ def initialize_and_reset_data(pathname, reset_clicks, clear_reg_clicks, clear_ac
         if stories_featured_max is not None:
             mask &= df['num_of_stories_featured'] <= stories_featured_max
 
-        # Apply search filter
-        if triggered_id == 'user-id-search' and user_id_search:
+        # Apply the mask first
+        filtered_df = df[mask].copy()
+
+        # Then aggregate by user_id
+        filtered_df = filtered_df.groupby('user_id').agg({
+            'df2_full_name': 'first',
+            'df2_username': 'first',
+            'df2_user_type': 'first',
+            'df2_registration_date': 'first',
+            'df2_membership': lambda x: x.fillna('No membership').iloc[-1],  # Take the last non-null value or 'No membership'
+            'df2_country': 'first',
+            'region': 'first',
+            'df2_profile_url': 'first',
+            'df2_social_links': 'first',
+            'df3_avg_aesthetic_score': 'mean',
+            'df2_avg_lai_score': 'mean',
+            'df2_exclusivity_rate': 'mean',
+            'df2_acceptance_rate': 'mean',
+            'num_of_photos_featured': 'sum',
+            'num_of_galleries_featured': 'sum',
+            'num_of_stories_featured': 'sum',
+            'total_uploads': 'sum',
+            'total_licensing_submissions': 'sum',
+            'total_sales_revenue': 'sum',
+            'total_num_of_sales': 'sum',
+            'df3_photo_likes': 'sum',
+            'df3_comments': 'sum',
+            'df3_avg_visit_days_monthly': 'mean'
+        }).reset_index()
+
+        # Apply numeric filters after aggregation
+        if uploads_min is not None:
+            filtered_df = filtered_df[filtered_df['total_uploads'] >= uploads_min]
+        if uploads_max is not None:
+            filtered_df = filtered_df[filtered_df['total_uploads'] <= uploads_max]
+        if licensing_min is not None:
+            filtered_df = filtered_df[filtered_df['total_licensing_submissions'] >= licensing_min]
+        if licensing_max is not None:
+            filtered_df = filtered_df[filtered_df['total_licensing_submissions'] <= licensing_max]
+        if sales_min is not None:
+            filtered_df = filtered_df[filtered_df['total_num_of_sales'] >= sales_min]
+        if sales_max is not None:
+            filtered_df = filtered_df[filtered_df['total_num_of_sales'] <= sales_max]
+        if revenue_min is not None:
+            filtered_df = filtered_df[filtered_df['total_sales_revenue'] >= revenue_min]
+        if revenue_max is not None:
+            filtered_df = filtered_df[filtered_df['total_sales_revenue'] <= revenue_max]
+        if likes_min is not None:
+            filtered_df = filtered_df[filtered_df['df3_photo_likes'] >= likes_min]
+        if likes_max is not None:
+            filtered_df = filtered_df[filtered_df['df3_photo_likes'] <= likes_max]
+        if comments_min is not None:
+            filtered_df = filtered_df[filtered_df['df3_comments'] >= comments_min]
+        if comments_max is not None:
+            filtered_df = filtered_df[filtered_df['df3_comments'] <= comments_max]
+        if photos_featured_min is not None:
+            filtered_df = filtered_df[filtered_df['num_of_photos_featured'] >= photos_featured_min]
+        if photos_featured_max is not None:
+            filtered_df = filtered_df[filtered_df['num_of_photos_featured'] <= photos_featured_max]
+        if galleries_featured_min is not None:
+            filtered_df = filtered_df[filtered_df['num_of_galleries_featured'] >= galleries_featured_min]
+        if galleries_featured_max is not None:
+            filtered_df = filtered_df[filtered_df['num_of_galleries_featured'] <= galleries_featured_max]
+        if stories_featured_min is not None:
+            filtered_df = filtered_df[filtered_df['num_of_stories_featured'] >= stories_featured_min]
+        if stories_featured_max is not None:
+            filtered_df = filtered_df[filtered_df['num_of_stories_featured'] <= stories_featured_max]
+
+        # Apply search filter after aggregation
+        if user_id_search:
             try:
-                search_ids = [int(id_str) for id_str in re.findall(r'\d+', user_id_search)]
+                search_ids = [str(id_str) for id_str in re.findall(r'\d+', user_id_search)]
                 if search_ids:
-                    mask &= df['user_id'].isin(search_ids)
+                    filtered_df = filtered_df[filtered_df['user_id'].astype(str).isin(search_ids)]
             except ValueError:
                 pass
 
-        filtered_user_ids = df[mask]['user_id'].astype(str).tolist()
+        # Convert user_id to numeric for proper sorting
+        filtered_df['user_id'] = pd.to_numeric(filtered_df['user_id'])
+        filtered_df = filtered_df.sort_values('user_id')
+
+        filtered_user_ids = filtered_df['user_id'].astype(str).tolist()
         
         return filtered_user_ids, filtered_user_ids, user_type_options, region_options, membership_options, reg_start or min_reg_date, reg_end or max_reg_date, act_start or min_act_date, act_end or max_act_date
         
@@ -1303,61 +1377,60 @@ def update_table(filtered_user_ids, reg_start, reg_end, act_start, act_end,
     # Convert user_id to string for consistent comparison
     df['user_id'] = df['user_id'].astype(str)
     
-    # Filter dataframe based on filtered_user_ids first
+    # Create initial mask based on filtered_user_ids
     if filtered_user_ids:
-        mask = df['user_id'].astype(str).isin(filtered_user_ids)
+        mask = df['user_id'].isin(filtered_user_ids)
     else:
         mask = pd.Series(True, index=df.index)
     
-    filtered_df = df[mask].copy()
-    
-    # Convert user_id to numeric for proper sorting
-    df['user_id'] = pd.to_numeric(df['user_id'])
-    filtered_df = df[df['user_id'].isin([int(id) for id in filtered_user_ids])]
-
-    # Apply all other filters
-    if reg_start and reg_end:
-        mask &= (df['registration_date'] >= reg_start) & (df['registration_date'] <= reg_end)
+    # Apply date filters
     if act_start and act_end:
+        act_start = pd.to_datetime(act_start).date()
+        act_end = pd.to_datetime(act_end).date()
         mask &= (df['activity_week'] >= act_start) & (df['activity_week'] <= act_end)
     
+    if reg_start and reg_end:
+        reg_start = pd.to_datetime(reg_start).date()
+        reg_end = pd.to_datetime(reg_end).date()
+        mask &= (df['df2_registration_date'] >= reg_start) & (df['df2_registration_date'] <= reg_end)
+
     # Apply dropdown filters
     if user_types:
-        mask &= df['user_type'].isin(user_types)
+        mask &= df['df2_user_type'].isin(user_types)
     if regions:
         mask &= df['region'].isin(regions)
     if membership_types:
-        mask &= df['membership'].isin(membership_types)
+        mask &= df['df2_membership'].isin(membership_types)
     
     # Apply slider filters
     if avg_aesthetic_score_range:
         mask &= (df['df3_avg_aesthetic_score'] >= avg_aesthetic_score_range[0]) & (df['df3_avg_aesthetic_score'] <= avg_aesthetic_score_range[1])
     if avg_lai_score_range:
-        mask &= (df['avg_lai_score'] >= avg_lai_score_range[0]) & (df['avg_lai_score'] <= avg_lai_score_range[1])
+        mask &= (df['df2_avg_lai_score'] >= avg_lai_score_range[0]) & (df['df2_avg_lai_score'] <= avg_lai_score_range[1])
     if exclusivity_rate_range:
-        mask &= (df['exclusivity_rate'] >= exclusivity_rate_range[0]) & (df['exclusivity_rate'] <= exclusivity_rate_range[1])
+        mask &= (df['df2_exclusivity_rate'] >= exclusivity_rate_range[0]) & (df['df2_exclusivity_rate'] <= exclusivity_rate_range[1])
     if acceptance_rate_range:
-        mask &= (df['acceptance_rate'] >= acceptance_rate_range[0]) & (df['acceptance_rate'] <= acceptance_rate_range[1])
+        mask &= (df['df2_acceptance_rate'] >= acceptance_rate_range[0]) & (df['df2_acceptance_rate'] <= acceptance_rate_range[1])
     if avg_visit_days_range:
         mask &= (df['df3_avg_visit_days_monthly'] >= avg_visit_days_range[0]) & (df['df3_avg_visit_days_monthly'] <= avg_visit_days_range[1])
     
     # Apply numeric filters
     if uploads_min is not None:
-        mask &= df['df2_total_uploads'] >= uploads_min
+        mask &= df['total_uploads'] >= uploads_min
     if uploads_max is not None:
-        mask &= df['df2_total_uploads'] <= uploads_max
+        mask &= df['total_uploads'] <= uploads_max
     if licensing_min is not None:
-        mask &= df['df2_total_licensing_submissions'] >= licensing_min
+        mask &= df['total_licensing_submissions'] >= licensing_min
     if licensing_max is not None:
-        mask &= df['df2_total_licensing_submissions'] <= licensing_max
+        mask &= df['total_licensing_submissions'] <= licensing_max
     if sales_min is not None:
-        mask &= df['df2_total_num_of_sales'] >= sales_min
+        mask &= df['total_num_of_sales'] >= sales_min
     if sales_max is not None:
-        mask &= df['df2_total_num_of_sales'] <= sales_max
+        mask &= df['total_num_of_sales'] <= sales_max
     if revenue_min is not None:
-        mask &= df['df2_total_sales_revenue'] >= revenue_min
+        mask &= df['total_sales_revenue'] >= revenue_min
     if revenue_max is not None:
-        mask &= df['df2_total_sales_revenue'] <= revenue_max
+        mask &= df['total_sales_revenue'] <= revenue_max
     if likes_min is not None:
         mask &= df['df3_photo_likes'] >= likes_min
     if likes_max is not None:
@@ -1379,17 +1452,86 @@ def update_table(filtered_user_ids, reg_start, reg_end, act_start, act_end,
     if stories_featured_max is not None:
         mask &= df['num_of_stories_featured'] <= stories_featured_max
 
-    # Apply search filter
+    # Apply the mask first
+    filtered_df = df[mask].copy()
+
+    # Then aggregate by user_id
+    filtered_df = filtered_df.groupby('user_id').agg({
+        'df2_full_name': 'first',
+        'df2_username': 'first',
+        'df2_user_type': 'first',
+        'df2_registration_date': 'first',
+        'df2_membership': lambda x: x.fillna('No membership').iloc[-1],  # Take the last non-null value or 'No membership'
+        'df2_country': 'first',
+        'region': 'first',
+        'df2_profile_url': 'first',
+        'df2_social_links': 'first',
+        'df3_avg_aesthetic_score': 'mean',
+        'df2_avg_lai_score': 'mean',
+        'df2_exclusivity_rate': 'mean',
+        'df2_acceptance_rate': 'mean',
+        'num_of_photos_featured': 'sum',
+        'num_of_galleries_featured': 'sum',
+        'num_of_stories_featured': 'sum',
+        'total_uploads': 'sum',
+        'total_licensing_submissions': 'sum',
+        'total_sales_revenue': 'sum',
+        'total_num_of_sales': 'sum',
+        'df3_photo_likes': 'sum',
+        'df3_comments': 'sum',
+        'df3_avg_visit_days_monthly': 'mean'
+    }).reset_index()
+
+    # Apply numeric filters after aggregation
+    if uploads_min is not None:
+        filtered_df = filtered_df[filtered_df['total_uploads'] >= uploads_min]
+    if uploads_max is not None:
+        filtered_df = filtered_df[filtered_df['total_uploads'] <= uploads_max]
+    if licensing_min is not None:
+        filtered_df = filtered_df[filtered_df['total_licensing_submissions'] >= licensing_min]
+    if licensing_max is not None:
+        filtered_df = filtered_df[filtered_df['total_licensing_submissions'] <= licensing_max]
+    if sales_min is not None:
+        filtered_df = filtered_df[filtered_df['total_num_of_sales'] >= sales_min]
+    if sales_max is not None:
+        filtered_df = filtered_df[filtered_df['total_num_of_sales'] <= sales_max]
+    if revenue_min is not None:
+        filtered_df = filtered_df[filtered_df['total_sales_revenue'] >= revenue_min]
+    if revenue_max is not None:
+        filtered_df = filtered_df[filtered_df['total_sales_revenue'] <= revenue_max]
+    if likes_min is not None:
+        filtered_df = filtered_df[filtered_df['df3_photo_likes'] >= likes_min]
+    if likes_max is not None:
+        filtered_df = filtered_df[filtered_df['df3_photo_likes'] <= likes_max]
+    if comments_min is not None:
+        filtered_df = filtered_df[filtered_df['df3_comments'] >= comments_min]
+    if comments_max is not None:
+        filtered_df = filtered_df[filtered_df['df3_comments'] <= comments_max]
+    if photos_featured_min is not None:
+        filtered_df = filtered_df[filtered_df['num_of_photos_featured'] >= photos_featured_min]
+    if photos_featured_max is not None:
+        filtered_df = filtered_df[filtered_df['num_of_photos_featured'] <= photos_featured_max]
+    if galleries_featured_min is not None:
+        filtered_df = filtered_df[filtered_df['num_of_galleries_featured'] >= galleries_featured_min]
+    if galleries_featured_max is not None:
+        filtered_df = filtered_df[filtered_df['num_of_galleries_featured'] <= galleries_featured_max]
+    if stories_featured_min is not None:
+        filtered_df = filtered_df[filtered_df['num_of_stories_featured'] >= stories_featured_min]
+    if stories_featured_max is not None:
+        filtered_df = filtered_df[filtered_df['num_of_stories_featured'] <= stories_featured_max]
+
+    # Apply search filter after aggregation
     if user_id_search:
         try:
-            search_ids = [int(id_str) for id_str in re.findall(r'\d+', user_id_search)]
+            search_ids = [str(id_str) for id_str in re.findall(r'\d+', user_id_search)]
             if search_ids:
-                mask &= df['user_id'].isin(search_ids)
+                filtered_df = filtered_df[filtered_df['user_id'].astype(str).isin(search_ids)]
         except ValueError:
             pass
-    
-    # Apply the mask to get filtered dataframe
-    filtered_df = df[mask].copy()
+
+    # Convert user_id to numeric for proper sorting
+    filtered_df['user_id'] = pd.to_numeric(filtered_df['user_id'])
+    filtered_df = filtered_df.sort_values('user_id')
 
     # Sort the dataframe
     if sort_by and order:
@@ -1434,23 +1576,23 @@ def update_total_records_display(total_records):
 # Define the column mapping and order
 EXPORT_COLUMNS = {
     'user_id': 'User ID',
-    'username': 'Username',
-    'full_name': 'Name',
-    'user_type': 'User Type',
-    'registration_date': 'Registration Date',
-    'membership': 'Membership',
-    'country': 'Country',
+    'df2_username': 'Username',
+    'df2_full_name': 'Name',
+    'df2_user_type': 'User Type',
+    'df2_registration_date': 'Registration Date',
+    'df2_membership': 'Membership',
+    'df2_country': 'Country',
     'region': 'Region',
-    'profile_url': 'Profile URL',
-    'social_links': 'Social Links',
-    'df2_total_uploads': 'Uploads',
-    'df2_total_licensing_submissions': 'Licensing Submissions',
+    'df2_profile_url': 'Profile URL',
+    'df2_social_links': 'Social Links',
+    'total_uploads': 'Uploads',
+    'total_licensing_submissions': 'Licensing Submissions',
     'df3_avg_aesthetic_score': 'Avg Aesthetic Score',
-    'avg_lai_score': 'Avg LAI Score',
-    'exclusivity_rate': 'Exclusivity Rate',
-    'acceptance_rate': 'Acceptance Rate',
-    'df2_total_num_of_sales': 'Sales',
-    'df2_total_sales_revenue': 'Revenue',
+    'df2_avg_lai_score': 'Avg LAI Score',
+    'df2_exclusivity_rate': 'Exclusivity Rate',
+    'df2_acceptance_rate': 'Acceptance Rate',
+    'total_num_of_sales': 'Sales',
+    'total_sales_revenue': 'Revenue',
     'df3_photo_likes': 'Likes',
     'df3_comments': 'Comments',
     'df3_avg_visit_days_monthly': 'Avg Visit Days Monthly',
@@ -1486,7 +1628,7 @@ def export_selected_rows(n_clicks, selected_user_ids):
             return None, False
 
         # Format dates
-        df_selected['registration_date'] = pd.to_datetime(df_selected['registration_date']).dt.strftime('%Y-%m-%d')
+        df_selected['df2_registration_date'] = pd.to_datetime(df_selected['df2_registration_date']).dt.strftime('%Y-%m-%d')
         df_selected['activity_week'] = pd.to_datetime(df_selected['activity_week']).dt.strftime('%Y-%m-%d')
         
         # Select and rename columns
@@ -1555,10 +1697,10 @@ def reset_filters(reset_clicks, clear_reg_clicks, clear_act_clicks, reg_start_da
 
     # Load data to get min/max dates
     df = load_data()
-    min_reg_date = df['registration_date'].min().date().isoformat()
-    max_reg_date = df['registration_date'].max().date().isoformat()
-    min_act_date = df['activity_week'].min().date().isoformat()
-    max_act_date = df['activity_week'].max().date().isoformat()
+    min_reg_date = df['df2_registration_date'].min().isoformat()
+    max_reg_date = df['df2_registration_date'].max().isoformat()
+    min_act_date = df['activity_week'].min().isoformat()
+    max_act_date = df['activity_week'].max().isoformat()
 
     if button_id == 'reset-filters-button':
         return [
