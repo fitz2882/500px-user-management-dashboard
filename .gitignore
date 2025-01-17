@@ -30,3 +30,9 @@ logs/
 
 # IDE
 .idea
+
+#DB files
+*.db
+application/*.db
+application/user_data.db
+user_data.db
