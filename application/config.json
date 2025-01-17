@@ -9,8 +9,8 @@
     "output_folder": "./query_results",
     "fixed_output_csv": "./join_result.csv",
     "data_path": "./join_result.csv",
-    "country_mappings_path": "./mappings/country_mappings.json",
-    "region_mappings_path": "./mappings/region_mappings.json",
+    "country_mappings_path": "./country_mappings.json",
+    "region_mappings_path": "./region_mappings.json",
     "debug": false,
     "host": "localhost",
     "port": 8050
