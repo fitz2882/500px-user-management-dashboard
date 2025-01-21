@@ -40,6 +40,10 @@ def join_csv_files(csv_file_1, csv_file_2, csv_file_3, output_file):
         # Get all unique user_id and activity_week combinations
         weeks_df1 = df1[['user_id', 'activity_week']].copy()
         weeks_df3 = df3[['user_id', 'activity_week']].copy()
+
+        print(f"Unique weeks in df1: {sorted(weeks_df1['activity_week'].unique())}")
+        print(f"Unique weeks in df3: {sorted(weeks_df3['activity_week'].unique())}")
+
         all_weeks = pd.concat([weeks_df1, weeks_df3]).drop_duplicates()
         print(f"Total unique week combinations: {len(all_weeks)}")
 

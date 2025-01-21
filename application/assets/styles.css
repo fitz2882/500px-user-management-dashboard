@@ -590,7 +590,7 @@ table {
 }
 
 .no-results-row {
-    background-color: #ffa7a7 !important;
+    background-color: tomato;
     color: #000;
     font-size: 16px;
     font-weight: 700;

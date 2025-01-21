@@ -1,14 +1,14 @@
+from flask import Flask
 from layout.layout_setup import app
 from layout.main_layout import layout
 import json
 import dash_bootstrap_components as dbc
 from dotenv import load_dotenv
 import os
-from threading import Lock
 from flask_caching import Cache
 import logging
-import dash
 from utils.data_loading import init_data_loading
+from dash import Dash
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,47 +23,51 @@ try:
 except Exception as e:
     config = {}
 
+# Initialize the Flask server
+server = Flask(__name__)
+
+# Configure cache
+cache_config = {
+    'CACHE_TYPE': 'SimpleCache',  # Choose appropriate cache type
+    'CACHE_DEFAULT_TIMEOUT': 3600  # 1 hour
+}
+cache = Cache()
+cache.init_app(server, config=cache_config)
+
 # Initialize the Dash app
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-app.config.suppress_callback_exceptions = True
+app = Dash(__name__, server=server, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-# Initialize cache
-cache = Cache(app.server, config={
-    'CACHE_TYPE': 'filesystem',
-    'CACHE_DIR': 'cache',
-    'CACHE_DEFAULT_TIMEOUT': 3600
-})
-
-# Global variables
-df = None
-df_last_modified = None
-all_user_ids = []
-start_date_reg = None
-end_date_reg = None
-start_date_act = None
-end_date_act = None
-user_type_options = None
-region_options = None
-membership_options = None
-data_lock = Lock()
+# Initialize data loading with cache
+init_data_loading(cache)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Import layout and callbacks
-from layout.main_layout import layout
-from callbacks import register_callbacks
-
+# Set up layout
 app.layout = layout
 
-# Register all callbacks
-register_callbacks(app)
+# Register callbacks
+from callbacks.callbacks import (
+    initialize_and_reset_data,
+    reload_data,
+    update_selected_users,
+    update_page_number,
+    update_table,
+    reset_filters,
+    update_total_records_display,
+    export_selected_rows
+)
 
-# After creating cache
-init_data_loading(cache)
+# Initialize each callback
+initialize_and_reset_data(app)
+reload_data(app)
+update_selected_users(app)
+update_page_number(app)
+update_table(app)
+reset_filters(app)
+update_total_records_display(app)
+export_selected_rows(app)
 
-# Then import callbacks
-from callbacks import register_callbacks
-
+# Run the app
 if __name__ == '__main__':
     app.run_server(debug=False)

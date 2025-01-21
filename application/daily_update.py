@@ -7,6 +7,7 @@ from datetime import datetime
 from merge_utils import join_csv_files 
 import pandas as pd
 import shutil 
+from initialize_db import load_and_process_data
 
 def download_query_result(base_url, query_result_id, api_key, output_csv_file, max_retries=10, retry_delay=10):
     for attempt in range(max_retries):
@@ -106,6 +107,17 @@ def main():
     except Exception as e:
         print(f"Error during file merge: {str(e)}")
         raise
+
+    # After update is complete, reinitialize the database
+    CONFIG_PATH = './config.json'
+    CSV_PATH = './join_result.csv'
+    DB_PATH = './user_data.db'
+    
+    print("Reinitializing database with updated data...")
+    if os.path.exists(CSV_PATH):
+        load_and_process_data(CSV_PATH, CONFIG_PATH, DB_PATH)
+    else:
+        print(f"Error: CSV file not found at {CSV_PATH}")
 
 if __name__ == '__main__':
     main()

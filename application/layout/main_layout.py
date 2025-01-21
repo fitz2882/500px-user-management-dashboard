@@ -21,6 +21,7 @@ layout = app.layout = dbc.Container([
     dcc.Store(id='total_records', data=0),
     dcc.Store(id='selected_user_ids', data=[]),
     dcc.Store(id='filtered_user_ids', data=[]),
+    
     dbc.Row([
         # Left column - Table
         dbc.Col([

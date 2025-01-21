@@ -1,3 +1,4 @@
+import os
 import dash
 import pandas as pd
 import math
@@ -7,6 +8,9 @@ from utils.data_loading import load_data, load_paginated_data
 import re
 from utils.helpers import create_table_row
 import logging
+from initialize_db import load_and_process_data
+from utils.data_loading import load_data
+
 
 def get_cached_data(force_reload=False):
     return load_data(force_reload=force_reload)
@@ -15,9 +19,21 @@ def reload_cached_data():
     return get_cached_data(force_reload=True)
 
 def initialize_and_reset_data(app):
+
+    # Define membership display name mapping
+    MEMBERSHIP_DISPLAY_NAMES = {
+        '0': 'No membership',
+        '': 'No membership',
+        '-': 'No membership',
+        'Trial - Awesome Monthly - 30 Days': 'Trial - Awesome - M',
+        'Trial - Awesome Yearly - 30 Days': 'Trial - Awesome - Y',
+        'Trial - Pro Monthly - 30 Days': 'Trial - Pro - M',
+        'Trial - Pro Yearly - 30 Days': 'Trial - Pro - Y'
+    }
+
     @app.callback(
-        [Output('filtered_user_ids', 'data', allow_duplicate=True),
-         Output('selected_user_ids', 'data', allow_duplicate=True),
+        [Output('filtered_user_ids', 'data'),
+         Output('selected_user_ids', 'data'),
          Output('user-type-dropdown', 'options'),
          Output('region-dropdown', 'options'),
          Output('membership-dropdown', 'options'),
@@ -25,8 +41,7 @@ def initialize_and_reset_data(app):
          Output('registration-date-range', 'end_date', allow_duplicate=True),
          Output('activity-week-range', 'start_date', allow_duplicate=True),
          Output('activity-week-range', 'end_date', allow_duplicate=True)],
-        [Input('url', 'pathname'),
-         Input('reset-filters-button', 'n_clicks'),
+        [Input('reset-filters-button', 'n_clicks'),
          Input('clear-registration-date', 'n_clicks'),
          Input('clear-activity-week', 'n_clicks'),
          Input('user-id-search', 'n_submit'),
@@ -59,11 +74,12 @@ def initialize_and_reset_data(app):
          Input('num-galleries-featured-min', 'value'),
          Input('num-galleries-featured-max', 'value'),
          Input('num-stories-featured-min', 'value'),
-         Input('num-stories-featured-max', 'value')],
+         Input('num-stories-featured-max', 'value'),
+         Input('reload-data-button', 'n_clicks')],
         [State('user-id-search', 'value')],
         prevent_initial_call='initial_duplicate'
     )
-    def _initialize_and_reset_data(pathname, reset_clicks, clear_reg_clicks, clear_act_clicks,
+    def _initialize_and_reset_data(reset_clicks, clear_reg_clicks, clear_act_clicks,
                                 user_id_search_submit, reg_start, reg_end, act_start, act_end,
                                 user_types, regions, membership_types,
                                 avg_aesthetic_score_range, avg_lai_score_range,
@@ -78,23 +94,27 @@ def initialize_and_reset_data(app):
                                 photos_featured_min, photos_featured_max,
                                 galleries_featured_min, galleries_featured_max,
                                 stories_featured_min, stories_featured_max,
-                                user_id_search):
+                                user_id_search, reload_clicks):
         try:
             ctx = dash.callback_context
+            # Load data once at the start
+            df = load_data()
+            if df.empty:
+                return dash.no_update
+            
             if not ctx.triggered:
                 # On initial load, set default dates
-                df = load_data()
-                if df.empty:
-                    return dash.no_update
+                # Convert activity_week to datetime for proper min/max calculation
+                df['activity_week'] = pd.to_datetime(df['activity_week'])
                 
                 min_reg_date = pd.to_datetime(df['df2_registration_date'].min()).strftime('%Y-%m-%d')
                 max_reg_date = pd.to_datetime(df['df2_registration_date'].max()).strftime('%Y-%m-%d')
                 min_act_date = pd.to_datetime(df['activity_week'].min()).strftime('%Y-%m-%d')
-                max_act_date = pd.to_datetime(df['activity_week'].max()).strftime('%Y-%m-%d')
+                max_act_date = pd.to_datetime(df['activity_week'].max() + pd.Timedelta(days=6)).strftime('%Y-%m-%d')
                 
                 user_type_options = [{'label': ut, 'value': ut} for ut in sorted(df['df2_user_type'].dropna().unique())]
-                region_options = [{'label': region, 'value': region} for region in sorted(df['region'].dropna().unique())]
-                membership_options = [{'label': m, 'value': m} for m in sorted(df['df2_membership'].dropna().unique())]
+                region_options = [{'label': region, 'value': region} for region in df['region'].cat.categories]
+                membership_options = [{'label': m, 'value': m} for m in df['df2_membership'].cat.categories]
                 
                 return (df['user_id'].astype(str).tolist(), df['user_id'].astype(str).tolist(),
                        user_type_options, region_options, membership_options,
@@ -102,7 +122,6 @@ def initialize_and_reset_data(app):
             
             trigger = ctx.triggered[0]['prop_id'].split('.')[0]
             
-            df = load_data()
             if df.empty:
                 raise ValueError("No data loaded")
             
@@ -110,7 +129,7 @@ def initialize_and_reset_data(app):
             min_reg_date = pd.to_datetime(df['df2_registration_date'].min()).strftime('%Y-%m-%d')
             max_reg_date = pd.to_datetime(df['df2_registration_date'].max()).strftime('%Y-%m-%d')
             min_act_date = pd.to_datetime(df['activity_week'].min()).strftime('%Y-%m-%d')
-            max_act_date = pd.to_datetime(df['activity_week'].max()).strftime('%Y-%m-%d')
+            max_act_date = (pd.to_datetime(df['activity_week'].max()) + pd.Timedelta(days=6)).strftime('%Y-%m-%d')
             
             # Handle registration date range
             if trigger == 'registration-date-range':
@@ -134,7 +153,7 @@ def initialize_and_reset_data(app):
                 act_start = min_act_date
                 act_end = max_act_date
 
-            # Create the mask for filtering
+            # First apply date filters
             mask = pd.Series(True, index=df.index)
             
             # Apply registration date filter
@@ -145,87 +164,11 @@ def initialize_and_reset_data(app):
             if act_start and act_end:
                 mask &= (df['activity_week'] >= pd.to_datetime(act_start)) & (df['activity_week'] <= pd.to_datetime(act_end))
             
-            # Apply all other filters
-            if user_types:
-                mask &= df['df2_user_type'].isin(user_types if isinstance(user_types, list) else [user_types])
-            
-            # Apply region filter
-            if regions:
-                mask &= df['region'].isin(regions if isinstance(regions, list) else [regions])
-            
-            # Apply membership filter
-            if membership_types:
-                mask &= df['df2_membership'].isin(membership_types if isinstance(membership_types, list) else [membership_types])
-            
-            # Apply range filters
-            if avg_aesthetic_score_range:
-                mask &= (df['df3_avg_aesthetic_score'] >= avg_aesthetic_score_range[0]) & (df['df3_avg_aesthetic_score'] <= avg_aesthetic_score_range[1])
-            if avg_lai_score_range:
-                mask &= (df['df2_avg_lai_score'] >= avg_lai_score_range[0]) & (df['df2_avg_lai_score'] <= avg_lai_score_range[1])
-            if exclusivity_rate_range:
-                mask &= (df['df2_exclusivity_rate'] >= exclusivity_rate_range[0]) & (df['df2_exclusivity_rate'] <= exclusivity_rate_range[1])
-            if acceptance_rate_range:
-                mask &= (df['df2_acceptance_rate'] >= acceptance_rate_range[0]) & (df['df2_acceptance_rate'] <= acceptance_rate_range[1])
-            if avg_visit_days_range:
-                mask &= (df['df3_avg_visit_days_monthly'] >= avg_visit_days_range[0]) & (df['df3_avg_visit_days_monthly'] <= avg_visit_days_range[1])
-            
-            # Apply min/max filters
-            if uploads_min is not None:
-                mask &= df['total_uploads'] >= uploads_min
-            if uploads_max is not None:
-                mask &= df['total_uploads'] <= uploads_max
-            
-            if licensing_min is not None:
-                mask &= df['total_licensing_submissions'] >= licensing_min
-            if licensing_max is not None:
-                mask &= df['total_licensing_submissions'] <= licensing_max
-            
-            if sales_min is not None:
-                mask &= df['total_num_of_sales'] >= sales_min
-            if sales_max is not None:
-                mask &= df['total_num_of_sales'] <= sales_max
-            
-            if revenue_min is not None:
-                mask &= df['total_sales_revenue'] >= revenue_min
-            if revenue_max is not None:
-                mask &= df['total_sales_revenue'] <= revenue_max
-            
-            if likes_min is not None:
-                mask &= df['df3_photo_likes'] >= likes_min
-            if likes_max is not None:
-                mask &= df['df3_photo_likes'] <= likes_max
-            
-            if comments_min is not None:
-                mask &= df['df3_comments'] >= comments_min
-            if comments_max is not None:
-                mask &= df['df3_comments'] <= comments_max
-            
-            if photos_featured_min is not None:
-                mask &= df['num_of_photos_featured'] >= photos_featured_min
-            if photos_featured_max is not None:
-                mask &= df['num_of_photos_featured'] <= photos_featured_max
-            
-            if galleries_featured_min is not None:
-                mask &= df['num_of_galleries_featured'] >= galleries_featured_min
-            if galleries_featured_max is not None:
-                mask &= df['num_of_galleries_featured'] <= galleries_featured_max
-            
-            if stories_featured_min is not None:
-                mask &= df['num_of_stories_featured'] >= stories_featured_min
-            if stories_featured_max is not None:
-                mask &= df['num_of_stories_featured'] <= stories_featured_max
-            
-            # Apply user ID search filter
-            if user_id_search:
-                search_ids = [id.strip() for id in user_id_search.split(',')]
-                mask &= df['user_id'].astype(str).isin(search_ids)
-            
-            # Apply the mask to get filtered data
+            # Apply initial filter
             df_filtered = df.loc[mask].copy()
             
-            # Now aggregate by user_id with the filtered data
+            # Aggregate data first
             df_agg = df_filtered.groupby('user_id').agg({
-                # Profile info - use first since these don't change
                 'df2_username': 'first',
                 'df2_full_name': 'first',
                 'df2_user_type': 'first',
@@ -253,7 +196,7 @@ def initialize_and_reset_data(app):
                 'num_of_stories_featured': 'sum'
             }).reset_index()
             
-            # Now apply all other filters on the aggregated data
+            # Now apply all filters on aggregated data
             mask = pd.Series(True, index=df_agg.index)
             
             if user_types:
@@ -319,8 +262,8 @@ def initialize_and_reset_data(app):
             # Get dropdown options from original data
             df_original = load_data()
             user_type_options = [{'label': ut, 'value': ut} for ut in sorted(df_original['df2_user_type'].dropna().unique())]
-            region_options = [{'label': region, 'value': region} for region in sorted(df_original['region'].dropna().unique())]
-            membership_options = [{'label': m, 'value': m} for m in sorted(df_original['df2_membership'].dropna().unique())]
+            region_options = [{'label': region, 'value': region} for region in df['region'].cat.categories]
+            membership_options = [{'label': m, 'value': m} for m in df['df2_membership'].cat.categories]
             
             return (filtered_user_ids, filtered_user_ids, user_type_options, region_options, membership_options,
                    reg_start, reg_end, act_start, act_end)
@@ -357,7 +300,7 @@ def update_selected_users(app):
         if not trigger and page_number is None:
             checkbox_values = [[id_dict['index']] for id_dict in checkbox_ids] if checkbox_ids else []
             return filtered_user_ids, ['all'], checkbox_values
-        
+
         # Handle page navigation or filtered_user_ids update
         if trigger in ['page-number', 'filtered_user_ids', None]:
             new_checkbox_values = []
@@ -493,16 +436,12 @@ def update_table(app):
             
             # Handle empty filtered_user_ids
             if not filtered_user_ids:
-                print("No filtered user IDs")
                 return [no_results_row], "Page 1 of 1", 1, 0
             
             # Use cached data
             df = load_data()
             if df is None or df.empty:
-                print("No data loaded")
                 return [no_results_row], "Page 1 of 1", 1, 0
-            
-            print(f"Loaded data shape: {df.shape}")
             
             # Filter for the current filtered_user_ids
             df = df.loc[df['user_id'].astype(str).isin(filtered_user_ids)].copy()
@@ -510,7 +449,7 @@ def update_table(app):
             # Apply activity week filter
             if act_start and act_end:
                 df = df.loc[(df['activity_week'] >= pd.to_datetime(act_start)) & 
-                           (df['activity_week'] <= pd.to_datetime(act_end))]
+                   (df['activity_week'] <= pd.to_datetime(act_end))]
             
             # Handle empty dataframe
             if df.empty:
@@ -582,7 +521,6 @@ def update_table(app):
         except Exception as e:
             import traceback
             print(f"Error in update_table: {str(e)}")
-            print(traceback.format_exc())
             no_results_row = dash.html.Tr([
                 dash.html.Td("No results found", colSpan=26, style={
                     'backgroundColor': 'tomato', 
@@ -649,7 +587,7 @@ def reset_filters(app):
         min_reg_date = pd.to_datetime(df['df2_registration_date'].min()).strftime('%Y-%m-%d')
         max_reg_date = pd.to_datetime(df['df2_registration_date'].max()).strftime('%Y-%m-%d')
         min_act_date = pd.to_datetime(df['activity_week'].min()).strftime('%Y-%m-%d')
-        max_act_date = pd.to_datetime(df['activity_week'].max()).strftime('%Y-%m-%d')
+        max_act_date = pd.to_datetime(df['activity_week'].max() + pd.Timedelta(days=6)).strftime('%Y-%m-%d')
 
         if button_id == 'reset-filters-button':
             return [
@@ -685,36 +623,45 @@ def reset_filters(app):
 
 def reload_data(app):
     @app.callback(
-        [Output('filtered_user_ids', 'data', allow_duplicate=True),
-         Output('selected_user_ids', 'data', allow_duplicate=True),
-         Output('reload-alert', 'is_open'),
-         Output('reset-filters-button', 'n_clicks')],  # Add this to trigger reset_filters
+        [
+            Output('reload-alert', 'is_open'),
+            Output('reset-filters-button', 'n_clicks')  # Trigger initialize_and_reset_data
+        ],
         [Input('reload-data-button', 'n_clicks')],
-        prevent_initial_call='initial_duplicate'
+        prevent_initial_call=True
     )
     def _reload_data(n_clicks):
+        if n_clicks is None:
+            return False, dash.no_update
+
         try:
-            if n_clicks is None:
-                return dash.no_update
-            
-            print("Reloading data...")
+        
+            # Reinitialize the database
+            CONFIG_PATH = './config.json'
+            CSV_PATH = './join_result.csv'
+            DB_PATH = './user_data.db'
+
+            if os.path.exists(CSV_PATH):
+                load_and_process_data(CSV_PATH, CONFIG_PATH, DB_PATH)
+            else:
+                return False, dash.no_update
+
             # Load fresh data (caching is handled in load_data)
             df = load_data(force_reload=True)
             
             if df is None or df.empty:
                 raise ValueError("No data loaded")
-                
+
             user_ids = df['user_id'].astype(str).tolist()
-            print(f"Reloaded {len(user_ids)} user IDs")
             
-            # Return values and trigger reset_filters by incrementing n_clicks
-            return user_ids, user_ids, True, n_clicks
-            
+            # Trigger the initialize_and_reset_data callback by incrementing n_clicks
+            new_n_clicks = n_clicks + 1 if n_clicks else 1
+            return True, new_n_clicks
+        
         except Exception as e:
             import traceback
             print(f"Error reloading data: {str(e)}")
-            print(traceback.format_exc())
-            return dash.no_update, dash.no_update, False, dash.no_update
+            return False, dash.no_update
 
 def update_total_records_display(app):
     @app.callback(
@@ -758,45 +705,46 @@ def export_selected_rows(app):
          Output("export-alert", "is_open", allow_duplicate=True)],
         [Input('export-button', 'n_clicks')],
         [State('selected_user_ids', 'data'),
-         State('filtered_user_ids', 'data')],
+         State('filtered_user_ids', 'data'),
+         State('user-id-search', 'value')],
         prevent_initial_call=True
     )
-    def _export_selected_rows(n_clicks, selected_user_ids, filtered_user_ids):
+    def _export_selected_rows(n_clicks, selected_user_ids, filtered_user_ids, user_id_search):
         if not n_clicks or not selected_user_ids or not filtered_user_ids:
-            print("Export cancelled: No data to export")
             return None, False
         
         try:
-            print("Starting export process...")
             # Load the full dataset
             df = load_data()
-            print(f"Data loaded, shape: {df.shape}")
             
             # Convert IDs to strings and prepare export list
-            print("Converting IDs to strings...")
             df['user_id'] = df['user_id'].astype(str)
-            selected_user_ids = set(str(id) for id in selected_user_ids)
+            
+            # Ensure we're only using the filtered user IDs
+             # Convert IDs to strings
+            df['user_id'] = df['user_id'].astype(str)
             filtered_user_ids = set(str(id) for id in filtered_user_ids)
+            selected_user_ids = set(str(id) for id in selected_user_ids)
+            
+
+             # Apply user ID search filter if present
+            if user_id_search:
+                search_ids = set(id.strip() for id in user_id_search.split(','))
+                filtered_user_ids = filtered_user_ids.intersection(search_ids)
             
             # Get intersection of selected and filtered IDs
             export_user_ids = selected_user_ids.intersection(filtered_user_ids)
-            print(f"Number of users to export: {len(export_user_ids)}")
             
             if not export_user_ids:
-                print("No users selected for export")
                 return None, False
             
             # Filter the dataframe
-            print("Filtering data...")
             mask = df['user_id'].isin(export_user_ids)
             df_selected = df.loc[mask].copy()
-            print(f"Filtered data shape: {df_selected.shape}")
             
             if df_selected.empty:
-                print("No data found for selected users")
                 return None, False
 
-            print("Starting aggregation...")
             # Pre-select only needed columns before aggregation
             needed_columns = ['user_id'] + [col for col in EXPORT_COLUMNS.keys() if col != 'user_id']
             df_selected = df_selected[needed_columns]
@@ -829,16 +777,11 @@ def export_selected_rows(app):
             }
             
             df_selected = df_selected.groupby('user_id', as_index=False).agg(agg_dict)
-            print(f"Aggregated data shape: {df_selected.shape}")
 
-            print("Formatting dates...")
             df_selected['df2_registration_date'] = pd.to_datetime(df_selected['df2_registration_date']).dt.strftime('%Y-%m-%d')
             
-            print("Preparing export data...")
             df_export = df_selected.rename(columns=EXPORT_COLUMNS)
-            print(f"Final export data shape: {df_export.shape}")
-            
-            print("Creating CSV file...")
+
             return dcc.send_data_frame(
                 df_export.to_csv,
                 filename='user_management_exported_data.csv',
@@ -848,8 +791,6 @@ def export_selected_rows(app):
             
         except Exception as e:
             print(f"Error in export: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
             return None, False
 
 def safe_numeric_value(value, default=None):

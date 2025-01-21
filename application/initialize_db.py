@@ -57,6 +57,10 @@ def load_and_process_data(csv_path, config_path, db_path='user_data.db'):
     
     print(f"Initial columns: {df.columns.tolist()}")
 
+    # Debug prints
+    print("Initial data load:")
+    print(f"Total rows: {len(df)}")
+
     # Convert to datetime without altering the dtype to datetime.date
     df['df2_registration_date'] = pd.to_datetime(df['df2_registration_date'], format=DATE_FORMAT, errors='coerce')
     df['activity_week'] = pd.to_datetime(df['activity_week'], format=DATE_FORMAT, errors='coerce')

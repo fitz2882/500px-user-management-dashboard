@@ -45,10 +45,72 @@ def load_data(force_reload=False):
     
     # Load fresh data
     df = load_data_from_db()
+
+    # Define membership display name mapping
+    membership_mapping = {
+        '0': 'No membership',
+        '': 'No membership',
+        '-': 'No membership',
+        'Trial - Awesome Monthly - 30 Days': 'Trial - Awesome - M',
+        'Trial - Awesome Yearly - 30 Days': 'Trial - Awesome - Y',
+        'Trial - Pro Monthly - 30 Days': 'Trial - Pro - M',
+        'Trial - Pro Yearly - 30 Days': 'Trial - Pro - Y'
+    }
+    
+    # Replace membership values with their display names
+    df['df2_membership'] = df['df2_membership'].astype(str).map(lambda x: membership_mapping.get(x, x))
+    
+    # Define custom sort order
+    membership_order = [
+        'No membership',
+        'Awesome - Monthly',
+        'Awesome - Yearly',
+        'Pro - Monthly',
+        'Pro - Yearly',
+        'Android - Monthly',
+        'Android - Yearly',
+        'iOS - Monthly',
+        'iOS - Yearly',
+        'Free Pro CX',
+        'Free Awesome CX',
+        'Trial - Awesome - M',
+        'Trial - Awesome - Y',
+        'Trial - Pro - M',
+        'Trial - Pro - Y'
+    ]
+    
+    # Create a categorical type with custom ordering
+    df['df2_membership'] = pd.Categorical(
+        df['df2_membership'],
+        categories=membership_order,
+        ordered=True
+    )
+
+    region_order = [
+        'North America',
+        'South America',
+        'Northern Europe',
+        'Southern Europe',
+        'Western Europe',
+        'Eastern Europe',
+        'Africa',
+        'Asia Pacific (excl. China & Indonesia)',
+        'China',
+        'Indonesia',
+        'Rest of Asia',
+        'Other'
+    ]
+
+    # Create a categorical type with custom ordering
+    df['region'] = pd.Categorical(
+        df['region'],
+        categories=region_order,
+        ordered=True
+    )
     
     # Cache the new data if cache is initialized
     if cache:
-        cache.set('data', df, timeout=3600)
+        cache.set('data', df, timeout=604800)
     
     return df
 
