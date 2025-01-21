@@ -36,3 +36,12 @@ logs/
 application/*.db
 application/user_data.db
 user_data.db
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+
+# Database backups
+*.bak
+*.backup
+*.dump
