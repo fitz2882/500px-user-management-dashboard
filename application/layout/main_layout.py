@@ -50,14 +50,16 @@ layout = app.layout = dbc.Container([
                                             html.Th('Social Links'),
                                             html.Th('Uploads *'),
                                             html.Th('Licensing Submissions *'),
-                                            html.Th('Avg Aesthetic Score'),
-                                            html.Th('Avg LAI Score'),
+                                            html.Th('Accepted Licensing Submissions *'),
+                                            html.Th('Median Aesthetic Score'),
+                                            html.Th('Median LAI Score'),
+                                            html.Th('Quality Score'),
                                             html.Th('Exclusivity Rate'),
                                             html.Th('Acceptance Rate'),
                                             html.Th('Sales *'),
                                             html.Th('Revenue *'),
-                                            html.Th('Likes *'),
-                                            html.Th('Comments *'),
+                                            html.Th('Likes Given *'),
+                                            html.Th('Comments Given *'),
                                             html.Th('AVG Visit Days (per Month)'),
                                             html.Th('Photos Featured *'),
                                             html.Th('Galleries Featured *'),
@@ -168,8 +170,10 @@ layout = app.layout = dbc.Container([
                                     {'label': 'Region', 'value': 'region'},
                                     {'label': 'Uploads', 'value': 'total_uploads'},
                                     {'label': 'Licensing Submissions', 'value': 'total_licensing_submissions'},
-                                    {'label': 'Avg Aesthetic Score', 'value': 'df3_avg_aesthetic_score'},
-                                    {'label': 'Avg LAI Score', 'value': 'df2_avg_lai_score'},
+                                    {'label': 'Accepted Submissions', 'value': 'total_accepted_licensing'},
+                                    {'label': 'Med Aesthetic Score', 'value': 'df3_med_aesthetic_score'},
+                                    {'label': 'Med LAI Score', 'value': 'df3_med_lai_score'},
+                                    {'label': 'Quality Score', 'value': 'df3_quality_score'},
                                     {'label': 'Exclusivity Rate', 'value': 'df2_exclusivity_rate'},
                                     {'label': 'Acceptance Rate', 'value': 'df2_acceptance_rate'},
                                     {'label': 'Sales', 'value': 'total_num_of_sales'},
@@ -344,6 +348,33 @@ layout = app.layout = dbc.Container([
                     ])
                 ], className='mb-4'),
 
+                # Inputs for Number of Accepted Licensing Submissions
+                html.Div([
+                    dbc.Label('Number of Accepted Submissions', className='label'),
+                    dbc.Row([
+                        dbc.Col([
+                            dcc.Input(
+                                id='num-accepted-licensing-min',
+                                type='number',
+                                debounce=True,
+                                placeholder='Min',
+                                style={'width': '100%'},
+                                className='dash-input'
+                            )
+                        ], width=6),
+                        dbc.Col([
+                            dcc.Input(
+                                id='num-accepted-licensing-max',
+                                type='number',
+                                debounce=True,
+                                placeholder='Max',
+                                style={'width': '100%'},
+                                className='dash-input'
+                            )
+                        ], width=6)
+                    ])
+                ], className='mb-4'),
+
                 # Inputs for Sales
                 html.Div([
                     dbc.Label('Number of Sales', className='label'),
@@ -400,7 +431,7 @@ layout = app.layout = dbc.Container([
 
                 # Inputs for Number of Likes
                 html.Div([
-                    dbc.Label('Number of Likes', className='label'),
+                    dbc.Label('Number of Likes Given', className='label'),
                     dbc.Row([
                         dbc.Col([
                             dcc.Input(
@@ -427,7 +458,7 @@ layout = app.layout = dbc.Container([
 
                 # Inputs for Number of Comments
                 html.Div([
-                    dbc.Label('Number of Comments', className='label'),
+                    dbc.Label('Number of Comments Given', className='label'),
                     dbc.Row([
                         dbc.Col([
                             dcc.Input(
@@ -547,11 +578,11 @@ layout = app.layout = dbc.Container([
                     )
                 ], className='mb-4'),
 
-                # Slider for Avg Aesthetic Score
+                # Slider for Median Aesthetic Score
                 html.Div([
-                    dbc.Label('Avg Aesthetic Score', className='label'),
+                    dbc.Label('Median Aesthetic Score', className='label'),
                     dcc.RangeSlider(
-                        id='avg-aesthetic-score-slider',
+                        id='med-aesthetic-score-slider',
                         min=0.00,
                         max=1.00,
                         step=0.01,
@@ -561,16 +592,30 @@ layout = app.layout = dbc.Container([
                     )
                 ], className='mb-4'),
 
-                # Slider for Avg LAI Score
+                # Slider for Med LAI Score
                 html.Div([
-                    dbc.Label('Avg LAI Score', className='label'),
+                    dbc.Label('Median LAI Score', className='label'),
                     dcc.RangeSlider(
-                        id='avg-lai-score-slider',
+                        id='med-lai-score-slider',
                         min=0.0,
                         max=10.0,
                         step=0.1,
                         value=[0.0, 10.0],  # Ensure this is a list
                         marks={i: f'{i}' for i in range(0, 11)},
+                        tooltip={"placement": "bottom", "always_visible": True}
+                    )
+                ], className='mb-4'),
+
+                # Slider for Quality Score
+                html.Div([
+                    dbc.Label('Quality Score', className='label'),
+                    dcc.RangeSlider(
+                        id='quality-score-slider',
+                        min=0.0,
+                        max=100.0,
+                        step=1,
+                        value=[0.0, 100.0],  # Ensure this is a list
+                        marks={i: f'{i}' for i in range(0, 101, 10)},
                         tooltip={"placement": "bottom", "always_visible": True}
                     )
                 ], className='mb-4'),

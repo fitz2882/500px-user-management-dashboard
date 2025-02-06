@@ -478,6 +478,22 @@ table {
     vertical-align: middle;
 }
 
+.table-sm th:nth-child(27),
+.table-sm td:nth-child(27) {
+    width: fit-content;
+    padding: 3px 20px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.table-sm th:nth-child(28),
+.table-sm td:nth-child(28) {
+    width: fit-content;
+    padding: 3px 20px;
+    text-align: center;
+    vertical-align: middle;
+}
+
 #page-display {
     margin: 0 10px;
 }
@@ -487,12 +503,17 @@ table {
     margin-top: 10px;
 }
 
-#avg-aesthetic-score-slider {
+#med-aesthetic-score-slider {
     padding: 0px 8px 25px !important;
     margin-top: 10px;
 }
 
-#avg-lai-score-slider {
+#med-lai-score-slider {
+    padding: 0px 8px 25px !important;
+    margin-top: 10px;
+}
+
+#quality-score-slider {
     padding: 0px 8px 25px !important;
     margin-top: 10px;
 }

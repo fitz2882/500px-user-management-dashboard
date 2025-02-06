@@ -52,8 +52,9 @@ def initialize_and_reset_data(app):
          Input('user-type-dropdown', 'value'),
          Input('region-dropdown', 'value'),
          Input('membership-dropdown', 'value'),
-         Input('avg-aesthetic-score-slider', 'value'),
-         Input('avg-lai-score-slider', 'value'),
+         Input('med-aesthetic-score-slider', 'value'),
+         Input('med-lai-score-slider', 'value'),
+         Input('quality-score-slider', 'value'),
          Input('exclusivity-rate-slider', 'value'),
          Input('acceptance-rate-slider', 'value'),
          Input('avg-visit-days-slider', 'value'),
@@ -61,6 +62,8 @@ def initialize_and_reset_data(app):
          Input('num-uploads-max', 'value'),
          Input('num-licensing-submissions-min', 'value'),
          Input('num-licensing-submissions-max', 'value'),
+         Input('num-accepted-licensing-min', 'value'),
+         Input('num-accepted-licensing-max', 'value'),
          Input('num-sales-min', 'value'),
          Input('num-sales-max', 'value'),
          Input('num-revenue-min', 'value'),
@@ -82,11 +85,12 @@ def initialize_and_reset_data(app):
     def _initialize_and_reset_data(reset_clicks, clear_reg_clicks, clear_act_clicks,
                                 user_id_search_submit, reg_start, reg_end, act_start, act_end,
                                 user_types, regions, membership_types,
-                                avg_aesthetic_score_range, avg_lai_score_range,
+                                med_aesthetic_score_range, med_lai_score_range, quality_score_range,
                                 exclusivity_rate_range, acceptance_rate_range,
                                 avg_visit_days_range,
                                 uploads_min, uploads_max,
                                 licensing_min, licensing_max,
+                                accepted_licensing_min, accepted_licensing_max,
                                 sales_min, sales_max,
                                 revenue_min, revenue_max,
                                 likes_min, likes_max,
@@ -179,14 +183,16 @@ def initialize_and_reset_data(app):
                 'df2_profile_url': 'first',
                 'df2_social_links': 'first',
                 # Metrics that are already averaged - use first
-                'df3_avg_aesthetic_score': 'first',
-                'df2_avg_lai_score': 'first',
+                'df3_med_aesthetic_score': 'first',
+                'df3_med_lai_score': 'first',
+                'df3_quality_score': 'first',
                 'df2_exclusivity_rate': 'first',
                 'df2_acceptance_rate': 'first',
                 'df3_avg_visit_days_monthly': 'first',
                 # Activity metrics - sum for the filtered period
                 'total_uploads': 'sum',
                 'total_licensing_submissions': 'sum',
+                'total_accepted_licensing': 'sum',
                 'total_sales_revenue': 'sum',
                 'total_num_of_sales': 'sum',
                 'df3_photo_likes': 'sum',
@@ -207,10 +213,12 @@ def initialize_and_reset_data(app):
                 mask &= df_agg['df2_membership'].isin(membership_types if isinstance(membership_types, list) else [membership_types])
             
             # Apply numeric range filters on aggregated data
-            if avg_aesthetic_score_range:
-                mask &= (df_agg['df3_avg_aesthetic_score'] >= avg_aesthetic_score_range[0]) & (df_agg['df3_avg_aesthetic_score'] <= avg_aesthetic_score_range[1])
-            if avg_lai_score_range:
-                mask &= (df_agg['df2_avg_lai_score'] >= avg_lai_score_range[0]) & (df_agg['df2_avg_lai_score'] <= avg_lai_score_range[1])
+            if med_aesthetic_score_range:
+                mask &= (df_agg['df3_med_aesthetic_score'] >= med_aesthetic_score_range[0]) & (df_agg['df3_med_aesthetic_score'] <= med_aesthetic_score_range[1])
+            if med_lai_score_range:
+                mask &= (df_agg['df3_med_lai_score'] >= med_lai_score_range[0]) & (df_agg['df3_med_lai_score'] <= med_lai_score_range[1])
+            if quality_score_range:
+                mask &= (df_agg['df3_quality_score'] >= quality_score_range[0]) & (df_agg['df3_quality_score'] <= quality_score_range[1])
             if exclusivity_rate_range:
                 mask &= (df_agg['df2_exclusivity_rate'] >= exclusivity_rate_range[0]) & (df_agg['df2_exclusivity_rate'] <= exclusivity_rate_range[1])
             if acceptance_rate_range:
@@ -227,6 +235,10 @@ def initialize_and_reset_data(app):
                 mask &= df_agg['total_licensing_submissions'] >= licensing_min
             if licensing_max is not None:
                 mask &= df_agg['total_licensing_submissions'] <= licensing_max
+            if accepted_licensing_min is not None:
+                mask &= df_agg['total_accepted_licensing'] >= accepted_licensing_min
+            if accepted_licensing_max is not None:
+                mask &= df_agg['total_accepted_licensing'] <= accepted_licensing_max
             if sales_min is not None:
                 mask &= df_agg['total_num_of_sales'] >= sales_min
             if sales_max is not None:
@@ -425,7 +437,7 @@ def update_table(app):
             
             # Create no results row
             no_results_row = dash.html.Tr([
-                dash.html.Td("No results found", colSpan=26, style={
+                dash.html.Td("No results found", colSpan=28, style={
                     'backgroundColor': 'tomato', 
                     'textAlign': 'left',
                     'padding': '10px',
@@ -467,14 +479,16 @@ def update_table(app):
                 'df2_profile_url': 'first',
                 'df2_social_links': 'first',
                 # Use first for pre-averaged metrics
-                'df3_avg_aesthetic_score': 'first',
-                'df2_avg_lai_score': 'first',
+                'df3_med_aesthetic_score': 'first',
+                'df3_med_lai_score': 'first',
+                'df3_quality_score': 'first',
                 'df2_exclusivity_rate': 'first',
                 'df2_acceptance_rate': 'first',
                 'df3_avg_visit_days_monthly': 'first',
                 # Sum activity metrics for the filtered period
                 'total_uploads': 'sum',
                 'total_licensing_submissions': 'sum',
+                'total_accepted_licensing': 'sum',
                 'total_sales_revenue': 'sum',
                 'total_num_of_sales': 'sum',
                 'df3_photo_likes': 'sum',
@@ -522,7 +536,7 @@ def update_table(app):
             import traceback
             print(f"Error in update_table: {str(e)}")
             no_results_row = dash.html.Tr([
-                dash.html.Td("No results found", colSpan=26, style={
+                dash.html.Td("No results found", colSpan=28, style={
                     'backgroundColor': 'tomato', 
                     'textAlign': 'left',
                     'padding': '10px',
@@ -541,8 +555,9 @@ def reset_filters(app):
          Output('user-type-dropdown', 'value'),
          Output('membership-dropdown', 'value'),
          Output('region-dropdown', 'value'),
-         Output('avg-aesthetic-score-slider', 'value'),
-         Output('avg-lai-score-slider', 'value'),
+         Output('med-aesthetic-score-slider', 'value'),
+         Output('med-lai-score-slider', 'value'),
+         Output('quality-score-slider', 'value'),
          Output('exclusivity-rate-slider', 'value'),
          Output('acceptance-rate-slider', 'value'),
          Output('avg-visit-days-slider', 'value'),
@@ -550,6 +565,8 @@ def reset_filters(app):
          Output('num-uploads-max', 'value'),
          Output('num-licensing-submissions-min', 'value'),
          Output('num-licensing-submissions-max', 'value'),
+         Output('num-accepted-licensing-min', 'value'),
+         Output('num-accepted-licensing-max', 'value'),
          Output('num-sales-min', 'value'),
          Output('num-sales-max', 'value'),
          Output('num-revenue-min', 'value'),
@@ -598,11 +615,13 @@ def reset_filters(app):
                 None,  # region
                 [0.00, 1.00],  # aesthetic score
                 [0.0, 10.0],  # LAI score
+                [0.0, 100.0],  # quality score
                 [0.0, 100.0],  # exclusivity rate
                 [0.0, 100.0],  # acceptance rate
                 [0, 31],  # visit days
                 None, None,  # uploads
                 None, None,  # licensing submissions
+                None, None,  # licensing accepted
                 None, None,  # sales
                 None, None,  # revenue
                 None, None,  # likes
@@ -615,11 +634,11 @@ def reset_filters(app):
                 'asc'   # order by
             ]
         elif button_id == 'clear-activity-week':
-            return [reg_start_date, reg_end_date, min_act_date, max_act_date] + [dash.no_update] * 29
+            return [reg_start_date, reg_end_date, min_act_date, max_act_date] + [dash.no_update] * 32
         elif button_id == 'clear-registration-date':
-            return [min_reg_date, max_reg_date, act_start_date, act_end_date] + [dash.no_update] * 29
+            return [min_reg_date, max_reg_date, act_start_date, act_end_date] + [dash.no_update] * 32
 
-        return [dash.no_update] * 33
+        return [dash.no_update] * 36
 
 def reload_data(app):
     @app.callback(
@@ -686,8 +705,10 @@ def export_selected_rows(app):
         'df2_social_links': 'Social Links',
         'total_uploads': 'Uploads',
         'total_licensing_submissions': 'Licensing Submissions',
-        'df3_avg_aesthetic_score': 'Avg Aesthetic Score',
-        'df2_avg_lai_score': 'Avg LAI Score',
+        'total_accepted_licensing': 'Accepted Licensing Submissions',
+        'df3_med_aesthetic_score': 'Median Aesthetic Score',
+        'df3_med_lai_score': 'Median LAI Score',
+        'df3_quality_score': 'Quality Score',
         'df2_exclusivity_rate': 'Exclusivity Rate',
         'df2_acceptance_rate': 'Acceptance Rate',
         'total_num_of_sales': 'Sales',
@@ -760,20 +781,24 @@ def export_selected_rows(app):
                 'region': 'first',
                 'df2_profile_url': 'first',
                 'df2_social_links': 'first',
-                'df3_avg_aesthetic_score': 'mean',
-                'df2_avg_lai_score': 'mean',
-                'df2_exclusivity_rate': 'mean',
-                'df2_acceptance_rate': 'mean',
-                'num_of_photos_featured': 'sum',
-                'num_of_galleries_featured': 'sum',
-                'num_of_stories_featured': 'sum',
+                # Use first for pre-averaged metrics
+                'df3_med_aesthetic_score': 'first',
+                'df3_med_lai_score': 'first',
+                'df3_quality_score': 'first',
+                'df2_exclusivity_rate': 'first',
+                'df2_acceptance_rate': 'first',
+                'df3_avg_visit_days_monthly': 'first',
+                # Sum activity metrics for the filtered period
                 'total_uploads': 'sum',
                 'total_licensing_submissions': 'sum',
+                'total_accepted_licensing': 'sum',
                 'total_sales_revenue': 'sum',
                 'total_num_of_sales': 'sum',
                 'df3_photo_likes': 'sum',
                 'df3_comments': 'sum',
-                'df3_avg_visit_days_monthly': 'mean'
+                'num_of_photos_featured': 'sum',
+                'num_of_galleries_featured': 'sum',
+                'num_of_stories_featured': 'sum'
             }
             
             df_selected = df_selected.groupby('user_id', as_index=False).agg(agg_dict)

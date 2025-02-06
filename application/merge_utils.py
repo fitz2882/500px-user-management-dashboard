@@ -76,7 +76,7 @@ def join_csv_files(csv_file_1, csv_file_2, csv_file_3, output_file):
         print("Filling missing values...")
         # Fill activity metrics with 0
         activity_columns = [
-            'total_uploads', 'total_licensing_submissions', 'total_sales_revenue',
+            'total_uploads', 'total_licensing_submissions', 'total_accepted_licensing', 'total_sales_revenue',
             'total_num_of_sales', 'num_of_photos_featured', 'num_of_galleries_featured',
             'num_of_stories_featured', 'df3_photo_likes', 'df3_comments'
         ]
@@ -89,8 +89,8 @@ def join_csv_files(csv_file_1, csv_file_2, csv_file_3, output_file):
         profile_columns = [
             'df2_full_name', 'df2_username', 'df2_user_type', 'df2_registration_date',
             'df2_membership', 'df2_country', 'df2_profile_url', 'df2_social_links',
-            'df2_avg_lai_score', 'df2_exclusivity_rate', 'df2_acceptance_rate',
-            'df3_avg_visit_days_monthly', 'df3_avg_aesthetic_score'
+            'df3_med_lai_score', 'df2_exclusivity_rate', 'df2_acceptance_rate',
+            'df3_avg_visit_days_monthly', 'df3_med_aesthetic_score', 'df3_quality_score'
         ]
 
         print("Forward filling profile data...")

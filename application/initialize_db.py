@@ -101,9 +101,9 @@ def load_and_process_data(csv_path, config_path, db_path='user_data.db'):
     
     # Ensure consistent data types for numeric columns
     numeric_columns = [
-        'total_uploads', 'total_licensing_submissions', 'total_num_of_sales',
+        'total_uploads', 'total_licensing_submissions', 'total_accepted_licensing', 'total_num_of_sales',
         'total_sales_revenue', 'df3_photo_likes', 'df3_comments',
-        'df3_avg_aesthetic_score', 'df2_avg_lai_score',
+        'df3_med_aesthetic_score', 'df3_med_lai_score', 'df3_quality_score',
         'df2_exclusivity_rate', 'df2_acceptance_rate',
         'df3_avg_visit_days_monthly', 'num_of_photos_featured',
         'num_of_galleries_featured', 'num_of_stories_featured'
@@ -144,8 +144,8 @@ def create_empty_dataframe():
         'user_id', 'df2_full_name', 'df2_username', 'df2_user_type',
         'df2_registration_date', 'df2_membership', 'df2_country',
         'region', 'df2_profile_url', 'df2_social_links',
-        'total_uploads', 'total_licensing_submissions', 'df3_avg_aesthetic_score',
-        'df2_avg_lai_score', 'df2_exclusivity_rate', 'df2_acceptance_rate',
+        'total_uploads', 'total_licensing_submissions', 'total_accepted_licensing', 'df3_med_aesthetic_score',
+        'df3_med_lai_score', 'df3_quality_score', 'df2_exclusivity_rate', 'df2_acceptance_rate',
         'df3_avg_visit_days_monthly', 'num_of_photos_featured',
         'num_of_galleries_featured', 'num_of_stories_featured',
         'total_num_of_sales', 'total_sales_revenue', 'df3_photo_likes',
